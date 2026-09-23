@@ -1,0 +1,28 @@
+# --- IDE / generated project files -------------------------------------------
+# Regenerate with: right-click MovementPlayground.uproject > Generate project files
+.vs/
+.idea/
+*.sln
+*.slnx
+*.suo
+*.opensdf
+*.sdf
+*.VC.db
+*.VC.opendb
+*.DotSettings.user
+
+# --- Engine-generated folders (rebuilt on demand) ----------------------------
+Binaries/
+Intermediate/
+Saved/
+DerivedDataCache/
+Plugins/**/Binaries/
+Plugins/**/Intermediate/
+
+# --- Personal developer sandbox folders --------------------------------------
+Content/Developers/
+
+# --- Build outputs / packaging -----------------------------------------------
+Build/*
+!Build/**/*.ico
+Packaged/
