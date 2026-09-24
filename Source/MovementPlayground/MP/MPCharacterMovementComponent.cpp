@@ -118,6 +118,9 @@ void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations
 
 void UMPCharacterMovementComponent::PhysSlide(float deltaTime, int32 Iterations)
 {
+	const float Speed = FMath::Max(0.f, Velocity.Size() - (deltaTime * SlideDeceleration));
+	Velocity = Velocity.GetSafeNormal() * Speed;
+	
 	const FVector Delta = Velocity * deltaTime;
 	const FQuat Rotation = UpdatedComponent->GetComponentQuat();
 	FHitResult Hit;
