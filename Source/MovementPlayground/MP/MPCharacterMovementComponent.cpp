@@ -1,6 +1,7 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "MP/MPCharacterMovementComponent.h"
+#include "MP/MPMovementTypes.h"
 
 DEFINE_LOG_CATEGORY(LogMPMovement);
 
@@ -50,7 +51,7 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 		ModeKey,
 		0.f,
 		FColor::Cyan,
-		FString::Printf(TEXT("Mode: %s (%d)"), *UEnum::GetValueAsString(MovementMode), CustomMovementMode)
+		FString::Printf(TEXT("Current mode: %s"), *MovementModeToString(MovementMode, CustomMovementMode))
 	);
 
 	GEngine->AddOnScreenDebugMessage(
@@ -67,17 +68,24 @@ void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations
 	
 }
 
+FString UMPCharacterMovementComponent::MovementModeToString(EMovementMode Mode, uint8 CustomMode)
+{
+	if (Mode != MOVE_Custom)
+	{
+		return UEnum::GetValueAsString(Mode);
+	}
+	
+	EMPCustomMovementMode CustomMovementType = static_cast<EMPCustomMovementMode>(CustomMode);
+	
+	return UEnum::GetValueAsString(CustomMovementType);
+}
+
 void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode)
 {
 	Super::OnMovementModeChanged(PreviousMovementMode, PreviousCustomMode);
 	
-	UE_LOG(
-		LogMPMovement,
-		Log,
-		TEXT("Mode: %s (%d) -> %s (%d)"),
-		*UEnum::GetValueAsString(PreviousMovementMode),
-		PreviousCustomMode,
-		*UEnum::GetValueAsString(MovementMode),
-		CustomMovementMode
+	UE_LOG(LogMPMovement, Log, TEXT("From %s to %s"),
+		*MovementModeToString(PreviousMovementMode, PreviousCustomMode),
+		*MovementModeToString(MovementMode, CustomMovementMode)
 	);
 }

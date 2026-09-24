@@ -23,8 +23,10 @@ public:
 	
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);
 protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
 	
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
+	
 };
