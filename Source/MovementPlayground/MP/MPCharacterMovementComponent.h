@@ -26,6 +26,12 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s^2"))
 	float SlideDeceleration = 400.0f;
 	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide")
+	float SlideGravityScale = 1.0f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s"))
+	float SlideMaxSpeed = 1500.0f;
+	
 public:
 	UMPCharacterMovementComponent();
 	

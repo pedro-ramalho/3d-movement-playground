@@ -118,32 +118,55 @@ void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations
 
 void UMPCharacterMovementComponent::PhysSlide(float deltaTime, int32 Iterations)
 {
-	const float Speed = FMath::Max(0.f, Velocity.Size() - (deltaTime * SlideDeceleration));
+	const float Gravity = GetGravityZ();
 	
-	FVector Direction = Velocity.GetSafeNormal();
+	const FVector GravityVector = FVector(0.f, 0.f, Gravity);
 	
-	if (CurrentFloor.IsWalkableFloor())
+	float RemainingTime = deltaTime;
+	
+	while (RemainingTime >= MIN_TICK_TIME && Iterations < MaxSimulationIterations)
 	{
-		Direction = FVector::VectorPlaneProject(Velocity.GetSafeNormal(), CurrentFloor.HitResult.ImpactNormal).GetSafeNormal();
-	}
+		Iterations++;
+		const float TimeTick = GetSimulationTimeStep(RemainingTime, Iterations);
+		RemainingTime -= TimeTick;
+		
+		FVector Direction = Velocity.GetSafeNormal();
+		
+		if (CurrentFloor.IsWalkableFloor())
+		{
+			const FVector SlopeAccelerationVector = FVector::VectorPlaneProject(
+				GravityVector, CurrentFloor.HitResult.ImpactNormal
+				) * SlideGravityScale;
+		
+			Velocity += TimeTick * SlopeAccelerationVector;
+		
+			Direction = FVector::VectorPlaneProject(Velocity.GetSafeNormal(), CurrentFloor.HitResult.ImpactNormal).GetSafeNormal();
+		}
 	
-	Velocity = Direction * Speed;
+		const float SpeedValue = Velocity.Size() - (TimeTick * SlideDeceleration);
+		const float Speed = FMath::Clamp(SpeedValue, 0.0f, SlideMaxSpeed);
 	
-	const FVector Delta = Velocity * deltaTime;
-	const FQuat Rotation = UpdatedComponent->GetComponentQuat();
-	FHitResult Hit;
+		Velocity = Direction * Speed;
 	
-	SafeMoveUpdatedComponent(Delta, Rotation, true, Hit);
+		const FVector Delta = Velocity * TimeTick;
+		const FQuat Rotation = UpdatedComponent->GetComponentQuat();
+		FHitResult Hit;
 	
-	FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
+		SafeMoveUpdatedComponent(Delta, Rotation, true, Hit);
 	
-	if (CurrentFloor.IsWalkableFloor())
-	{
-		AdjustFloorHeight();
-	}
-	else
-	{
-		SetMovementMode(MOVE_Falling);
+		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
+	
+		if (CurrentFloor.IsWalkableFloor())
+		{
+			AdjustFloorHeight();
+		}
+		else
+		{
+			SetMovementMode(MOVE_Falling);
+			StartNewPhysics(RemainingTime, Iterations);
+			
+			return;
+		}
 	}
 }
 
@@ -182,7 +205,13 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 	Super::OnMovementModeChanged(PreviousMovementMode, PreviousCustomMode);
 	
 	if (IsCustomMovementMode(EMPCustomMovementMode::Slide))
+	{
 		bWantsToCrouch = true;
+		bCrouchMaintainsBaseLocation = true;
+		
+		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
+		AdjustFloorHeight();
+	}
 	
 	UE_LOG(LogMPMovement, Log, TEXT("From %s to %s"),
 		*MovementModeToString(PreviousMovementMode, PreviousCustomMode),
