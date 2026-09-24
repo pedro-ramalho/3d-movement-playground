@@ -6,6 +6,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "MPCharacterMovementComponent.generated.h"
 
+enum class EMPCustomMovementMode : uint8;
+
 DECLARE_LOG_CATEGORY_EXTERN(LogMPMovement, Log, All);
 
 /**
@@ -18,12 +20,19 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	
 	bool bWantsToSlide;
 	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide")
+	float SlideEnterSpeed = 350.0f;
+	
 public:
 	UMPCharacterMovementComponent();
 	
 	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
 	
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+	virtual bool IsMovingOnGround() const override;
+	
+	bool IsCustomMovementMode(EMPCustomMovementMode Mode) const;
 
 	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);
 	

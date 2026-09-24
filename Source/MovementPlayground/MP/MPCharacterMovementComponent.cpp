@@ -14,6 +14,8 @@ static TAutoConsoleVariable<int32> CVarMPDebugMovement(
 
 UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 {
+	NavAgentProps.bCanCrouch = true;
+	
 	bWantsToSlide = false;
 	
 	// Rotation properties
@@ -33,6 +35,20 @@ UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 
 void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
 {
+	// Are we in walking mode?
+	if (MovementMode == MOVE_Walking)
+	{
+		// Do we want to slide?
+		if (bWantsToSlide)
+		{
+			// Do we have enough speed to slide?
+			if (Velocity.Size2D() >= SlideEnterSpeed)
+			{
+				SetMovementMode(MOVE_Custom, static_cast<uint8>(EMPCustomMovementMode::Slide));
+			}
+		}
+	}
+	
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
 }
 
@@ -54,6 +70,7 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 	constexpr int32 ModeKey = 1;
 	constexpr int32 SpeedKey = 2;
 	constexpr int32 SlideKey = 3;
+	constexpr int32 CrouchKey = 4;
 
 	GEngine->AddOnScreenDebugMessage(
 		ModeKey,
@@ -75,12 +92,38 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 		FColor::Cyan,
 		FString::Printf(TEXT("Wants to slide: %s"), bWantsToSlide ? TEXT("yes") : TEXT("no"))
 	);
+	
+	GEngine->AddOnScreenDebugMessage(
+		CrouchKey,
+		0.f,
+		FColor::Cyan,
+		FString::Printf(TEXT("Crouched: %s"), IsCrouching() ? TEXT("yes") : TEXT("no"))
+	);
+	
 #endif
 }
 
 void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations)
 {
 	
+}
+
+bool UMPCharacterMovementComponent::IsMovingOnGround() const
+{
+	if (IsCustomMovementMode(EMPCustomMovementMode::Slide))
+		return true;
+	
+	return Super::IsMovingOnGround();
+}
+
+bool UMPCharacterMovementComponent::IsCustomMovementMode(EMPCustomMovementMode Mode) const
+{
+	if (MovementMode != MOVE_Custom)
+		return false;
+	
+	EMPCustomMovementMode CustomMovementType = static_cast<EMPCustomMovementMode>(CustomMovementMode);
+	
+	return Mode == CustomMovementType;
 }
 
 FString UMPCharacterMovementComponent::MovementModeToString(EMovementMode Mode, uint8 CustomMode)
@@ -98,6 +141,9 @@ FString UMPCharacterMovementComponent::MovementModeToString(EMovementMode Mode, 
 void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode)
 {
 	Super::OnMovementModeChanged(PreviousMovementMode, PreviousCustomMode);
+	
+	if (IsCustomMovementMode(EMPCustomMovementMode::Slide))
+		bWantsToCrouch = true;
 	
 	UE_LOG(LogMPMovement, Log, TEXT("From %s to %s"),
 		*MovementModeToString(PreviousMovementMode, PreviousCustomMode),
