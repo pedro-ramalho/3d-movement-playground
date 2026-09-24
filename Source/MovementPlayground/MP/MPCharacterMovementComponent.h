@@ -37,8 +37,11 @@ public:
 	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);
 	
 	void SetWantsToSlide(bool bWants);
+	
 protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
+	
+	void PhysSlide(float deltaTime, int32 Iterations);
 	
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	

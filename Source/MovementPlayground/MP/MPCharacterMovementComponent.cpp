@@ -105,7 +105,24 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 
 void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations)
 {
+	switch (static_cast<EMPCustomMovementMode>(CustomMovementMode))
+	{
+	case EMPCustomMovementMode::Slide:
+		PhysSlide(deltaTime, Iterations);
+		break;
 	
+	default:
+		break;
+	}
+}
+
+void UMPCharacterMovementComponent::PhysSlide(float deltaTime, int32 Iterations)
+{
+	const FVector Delta = Velocity * deltaTime;
+	const FQuat Rotation = UpdatedComponent->GetComponentQuat();
+	FHitResult Hit;
+	
+	SafeMoveUpdatedComponent(Delta, Rotation, true, Hit);
 }
 
 bool UMPCharacterMovementComponent::IsMovingOnGround() const
