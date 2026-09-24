@@ -4,6 +4,13 @@
 
 DEFINE_LOG_CATEGORY(LogMPMovement);
 
+static TAutoConsoleVariable<int32> CVarMPDebugMovement(
+	TEXT("mp.Debug.Movement"),
+	0,
+	TEXT("Show MP movement debug overlay, 0: off, 1: on"),
+	ECVF_Cheat
+);
+
 UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 {
 	// Rotation properties
@@ -24,6 +31,35 @@ UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
 {
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
+}
+
+void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+{
+	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+#if !UE_BUILD_SHIPPING
+	if (CVarMPDebugMovement.GetValueOnGameThread() == 0 || !GEngine)
+	{
+		return;
+	}
+
+	constexpr int32 ModeKey = 1;
+	constexpr int32 SpeedKey = 2;
+
+	GEngine->AddOnScreenDebugMessage(
+		ModeKey,
+		0.f,
+		FColor::Cyan,
+		FString::Printf(TEXT("Mode: %s (%d)"), *UEnum::GetValueAsString(MovementMode), CustomMovementMode)
+	);
+
+	GEngine->AddOnScreenDebugMessage(
+		SpeedKey,
+		0.f,
+		FColor::Cyan,
+		FString::Printf(TEXT("Horizontal speed: %.0f cm/s"), Velocity.Size2D())
+	);
+#endif
 }
 
 void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations)

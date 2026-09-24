@@ -21,6 +21,7 @@ public:
 	
 	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
 	
+	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
