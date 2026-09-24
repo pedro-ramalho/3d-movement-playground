@@ -26,3 +26,6 @@ Content/Developers/
 Build/*
 !Build/**/*.ico
 Packaged/
+
+# --- Personal notes / planning -----------------------------------------------
+docs/
