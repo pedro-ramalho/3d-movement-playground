@@ -69,6 +69,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoLook(float Yaw, float Pitch);
 	
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoJumpStart();
+	
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoJumpEnd();
+	
 	FORCEINLINE UMPCharacterMovementComponent* GetMPMovement() const { return MPMovement; }
 	
 	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }

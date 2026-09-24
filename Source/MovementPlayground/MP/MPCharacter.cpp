@@ -95,3 +95,13 @@ void AMPCharacter::DoLook(float Yaw, float Pitch)
 		AddControllerPitchInput(Pitch);
 	}
 }
+
+void AMPCharacter::DoJumpStart()
+{
+	Jump();
+}
+
+void AMPCharacter::DoJumpEnd()
+{
+	StopJumping();
+}
