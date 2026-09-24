@@ -2,27 +2,14 @@
 
 
 #include "MP/MPCharacter.h"
+#include "MP/MPCharacterMovementComponent.h"
 
-// Sets default values
-AMPCharacter::AMPCharacter()
+AMPCharacter::AMPCharacter(const FObjectInitializer& ObjectInitializer) : Super(
+	ObjectInitializer.SetDefaultSubobjectClass<UMPCharacterMovementComponent>(CharacterMovementComponentName))
 {
- 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
-
-}
-
-// Called when the game starts or when spawned
-void AMPCharacter::BeginPlay()
-{
-	Super::BeginPlay();
+	PrimaryActorTick.bCanEverTick = false;
 	
-}
-
-// Called every frame
-void AMPCharacter::Tick(float DeltaTime)
-{
-	Super::Tick(DeltaTime);
-
+	MPMovement = CastChecked<UMPCharacterMovementComponent>(GetCharacterMovement());
 }
 
 // Called to bind functionality to input
@@ -31,4 +18,3 @@ void AMPCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	Super::SetupPlayerInputComponent(PlayerInputComponent);
 
 }
-

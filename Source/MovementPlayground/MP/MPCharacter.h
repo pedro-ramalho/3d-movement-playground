@@ -6,24 +6,23 @@
 #include "GameFramework/Character.h"
 #include "MPCharacter.generated.h"
 
+class UMPCharacterMovementComponent;
+
 UCLASS()
 class MOVEMENTPLAYGROUND_API AMPCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
+private:
+	UPROPERTY(Transient)
+	TObjectPtr<UMPCharacterMovementComponent> MPMovement;
+	
 public:
 	// Sets default values for this character's properties
-	AMPCharacter();
-
-protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	AMPCharacter(const FObjectInitializer& ObjectInitializer);
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-
+	
+	FORCEINLINE UMPCharacterMovementComponent* GetMPMovement() const { return MPMovement; }
 };
