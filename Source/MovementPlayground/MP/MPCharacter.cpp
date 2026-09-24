@@ -50,6 +50,9 @@ void AMPCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AMPCharacter::Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &AMPCharacter::StopJumping);
 		
+		EnhancedInputComponent->BindAction(SlideAction, ETriggerEvent::Started, this, &AMPCharacter::DoSlideStart);
+		EnhancedInputComponent->BindAction(SlideAction, ETriggerEvent::Completed, this, &AMPCharacter::DoSlideEnd);
+		
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AMPCharacter::Move);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AMPCharacter::Look);
 		
@@ -104,4 +107,14 @@ void AMPCharacter::DoJumpStart()
 void AMPCharacter::DoJumpEnd()
 {
 	StopJumping();
+}
+
+void AMPCharacter::DoSlideStart()
+{
+	GetMPMovement()->SetWantsToSlide(true);
+}
+
+void AMPCharacter::DoSlideEnd()
+{
+	GetMPMovement()->SetWantsToSlide(false);
 }

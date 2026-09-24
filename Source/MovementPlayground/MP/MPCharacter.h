@@ -38,6 +38,9 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> JumpAction;
 
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> SlideAction;
+	
 	/** Move Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> MoveAction;
@@ -74,6 +77,12 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
+	
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoSlideStart();
+	
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoSlideEnd();
 	
 	FORCEINLINE UMPCharacterMovementComponent* GetMPMovement() const { return MPMovement; }
 	

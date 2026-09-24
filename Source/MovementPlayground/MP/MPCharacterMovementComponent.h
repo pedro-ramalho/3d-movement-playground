@@ -16,6 +16,8 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 {
 	GENERATED_BODY()
 	
+	bool bWantsToSlide;
+	
 public:
 	UMPCharacterMovementComponent();
 	
@@ -24,6 +26,8 @@ public:
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
 	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);
+	
+	void SetWantsToSlide(bool bWants);
 protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
 	

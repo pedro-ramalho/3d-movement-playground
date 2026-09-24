@@ -14,6 +14,8 @@ static TAutoConsoleVariable<int32> CVarMPDebugMovement(
 
 UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 {
+	bWantsToSlide = false;
+	
 	// Rotation properties
 	bOrientRotationToMovement = true;
 	RotationRate = FRotator(0.0f, 500.0f, 0.0f);
@@ -34,6 +36,11 @@ void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float Del
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
 }
 
+void UMPCharacterMovementComponent::SetWantsToSlide(bool bWants)
+{
+	bWantsToSlide = bWants;
+}
+
 void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -46,6 +53,7 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 
 	constexpr int32 ModeKey = 1;
 	constexpr int32 SpeedKey = 2;
+	constexpr int32 SlideKey = 3;
 
 	GEngine->AddOnScreenDebugMessage(
 		ModeKey,
@@ -59,6 +67,13 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 		0.f,
 		FColor::Cyan,
 		FString::Printf(TEXT("Horizontal speed: %.0f cm/s"), Velocity.Size2D())
+	);
+	
+	GEngine->AddOnScreenDebugMessage(
+		SlideKey,
+		0.f,
+		FColor::Cyan,
+		FString::Printf(TEXT("Wants to slide: %s"), bWantsToSlide ? TEXT("yes") : TEXT("no"))
 	);
 #endif
 }
