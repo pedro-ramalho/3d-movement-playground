@@ -17,6 +17,8 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	GENERATED_BODY()
 	
 public:
+	UMPCharacterMovementComponent();
+	
 	virtual void UpdateCharacterStateBeforeMovement(float DeltaSeconds) override;
 	
 

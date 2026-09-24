@@ -7,6 +7,11 @@
 #include "MPCharacter.generated.h"
 
 class UMPCharacterMovementComponent;
+class USpringArmComponent;
+class UCameraComponent;
+class UInputAction;
+
+struct FInputActionValue;
 
 UCLASS()
 class MOVEMENTPLAYGROUND_API AMPCharacter : public ACharacter
@@ -17,6 +22,40 @@ private:
 	UPROPERTY(Transient)
 	TObjectPtr<UMPCharacterMovementComponent> MPMovement;
 	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<USpringArmComponent> CameraBoom;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCameraComponent> FollowCamera;
+
+	/** Camera Boom and Follow Camera Setup */
+	void SetupCameraBoom();
+	
+	void SetupFollowCamera();
+	
+protected:
+	/** Jump Input Action */
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> JumpAction;
+
+	/** Move Input Action */
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> MoveAction;
+
+	/** Look Input Action */
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> LookAction;
+
+	/** Mouse Look Input Action */
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> MouseLookAction;
+	
+	/** Called for movement */
+	void Move(const FInputActionValue& Value);
+	
+	/** Called for looking */
+	void Look(const FInputActionValue& Value);
+	
 public:
 	// Sets default values for this character's properties
 	AMPCharacter(const FObjectInitializer& ObjectInitializer);
@@ -24,5 +63,15 @@ public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 	
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoMove(float Right, float Forward);
+
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoLook(float Yaw, float Pitch);
+	
 	FORCEINLINE UMPCharacterMovementComponent* GetMPMovement() const { return MPMovement; }
+	
+	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+	
+	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 };

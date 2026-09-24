@@ -4,6 +4,23 @@
 
 DEFINE_LOG_CATEGORY(LogMPMovement);
 
+UMPCharacterMovementComponent::UMPCharacterMovementComponent()
+{
+	// Rotation properties
+	bOrientRotationToMovement = true;
+	RotationRate = FRotator(0.0f, 500.0f, 0.0f);
+	
+	// Jump properties
+	JumpZVelocity = 500.0f;
+	AirControl = 0.35f;
+	BrakingDecelerationFalling = 1500.0f;
+	
+	// Walking properties
+	MaxWalkSpeed = 500.f;
+	MinAnalogWalkSpeed = 20.f;
+	BrakingDecelerationWalking = 2000.f;
+}
+
 void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
 {
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
