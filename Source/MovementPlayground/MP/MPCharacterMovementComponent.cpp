@@ -119,13 +119,32 @@ void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations
 void UMPCharacterMovementComponent::PhysSlide(float deltaTime, int32 Iterations)
 {
 	const float Speed = FMath::Max(0.f, Velocity.Size() - (deltaTime * SlideDeceleration));
-	Velocity = Velocity.GetSafeNormal() * Speed;
+	
+	FVector Direction = Velocity.GetSafeNormal();
+	
+	if (CurrentFloor.IsWalkableFloor())
+	{
+		Direction = FVector::VectorPlaneProject(Velocity.GetSafeNormal(), CurrentFloor.HitResult.ImpactNormal).GetSafeNormal();
+	}
+	
+	Velocity = Direction * Speed;
 	
 	const FVector Delta = Velocity * deltaTime;
 	const FQuat Rotation = UpdatedComponent->GetComponentQuat();
 	FHitResult Hit;
 	
 	SafeMoveUpdatedComponent(Delta, Rotation, true, Hit);
+	
+	FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
+	
+	if (CurrentFloor.IsWalkableFloor())
+	{
+		AdjustFloorHeight();
+	}
+	else
+	{
+		SetMovementMode(MOVE_Falling);
+	}
 }
 
 bool UMPCharacterMovementComponent::IsMovingOnGround() const
