@@ -130,6 +130,14 @@ void UMPCharacterMovementComponent::PhysSlide(float deltaTime, int32 Iterations)
 		const float TimeTick = GetSimulationTimeStep(RemainingTime, Iterations);
 		RemainingTime -= TimeTick;
 		
+		if (Velocity.Size() <= SlideExitSpeed || !bWantsToSlide)
+		{
+			SetMovementMode(MOVE_Walking);
+			StartNewPhysics(RemainingTime, Iterations);
+			
+			return;
+		}
+		
 		FVector Direction = Velocity.GetSafeNormal();
 		
 		if (CurrentFloor.IsWalkableFloor())
@@ -211,6 +219,16 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 		
 		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
 		AdjustFloorHeight();
+	}
+	
+	if (PreviousMovementMode == MOVE_Custom)
+	{
+		EMPCustomMovementMode CustomMovementType = static_cast<EMPCustomMovementMode>(PreviousCustomMode);
+		
+		if (CustomMovementType == EMPCustomMovementMode::Slide)
+		{
+			bWantsToCrouch = false;
+		}
 	}
 	
 	UE_LOG(LogMPMovement, Log, TEXT("From %s to %s"),

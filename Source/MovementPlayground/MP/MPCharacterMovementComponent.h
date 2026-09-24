@@ -20,8 +20,11 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	
 	bool bWantsToSlide;
 	
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide")
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s"))
 	float SlideEnterSpeed = 350.0f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s"))
+	float SlideExitSpeed = 150.0f;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s^2"))
 	float SlideDeceleration = 400.0f;
