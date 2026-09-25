@@ -44,6 +44,8 @@ public:
 
 	virtual bool IsMovingOnGround() const override;
 	
+	virtual bool CanAttemptJump() const override;
+	
 	bool IsCustomMovementMode(EMPCustomMovementMode Mode) const;
 
 	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);

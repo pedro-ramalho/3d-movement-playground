@@ -8,6 +8,7 @@
 #include "Components/CapsuleComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
+#include "MP/MPMovementTypes.h"
 #include "MP/MPCharacterMovementComponent.h"
 
 AMPCharacter::AMPCharacter(const FObjectInitializer& ObjectInitializer) : Super(
@@ -117,4 +118,12 @@ void AMPCharacter::DoSlideStart()
 void AMPCharacter::DoSlideEnd()
 {
 	GetMPMovement()->SetWantsToSlide(false);
+}
+
+bool AMPCharacter::CanJumpInternal_Implementation() const
+{
+	if (GetMPMovement()->IsCustomMovementMode(EMPCustomMovementMode::Slide))
+		return JumpIsAllowedInternal();
+	
+	return Super::CanJumpInternal_Implementation();
 }

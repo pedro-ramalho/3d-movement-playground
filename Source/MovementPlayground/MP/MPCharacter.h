@@ -58,7 +58,8 @@ protected:
 	
 	/** Called for looking */
 	void Look(const FInputActionValue& Value);
-	
+
+	virtual bool CanJumpInternal_Implementation() const override;
 public:
 	// Sets default values for this character's properties
 	AMPCharacter(const FObjectInitializer& ObjectInitializer);

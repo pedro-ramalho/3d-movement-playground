@@ -186,6 +186,14 @@ bool UMPCharacterMovementComponent::IsMovingOnGround() const
 	return Super::IsMovingOnGround();
 }
 
+bool UMPCharacterMovementComponent::CanAttemptJump() const
+{
+	if (IsCustomMovementMode(EMPCustomMovementMode::Slide))
+		return IsJumpAllowed();
+	
+	return Super::CanAttemptJump();
+}
+
 bool UMPCharacterMovementComponent::IsCustomMovementMode(EMPCustomMovementMode Mode) const
 {
 	if (MovementMode != MOVE_Custom)
