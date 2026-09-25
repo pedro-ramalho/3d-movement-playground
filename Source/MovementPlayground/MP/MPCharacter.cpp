@@ -61,6 +61,23 @@ void AMPCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 	}
 }
 
+void AMPCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
+{
+	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
+	
+	if (PrevMovementMode == MOVE_Custom)
+	{
+		EMPCustomMovementMode PrevCustomType = static_cast<EMPCustomMovementMode>(PreviousCustomMode);
+		if (PrevCustomType == EMPCustomMovementMode::Slide && GetCharacterMovement()->MovementMode == MOVE_Walking)
+		{
+			if (SlideExitMontage)
+			{
+				PlayAnimMontage(SlideExitMontage);
+			}
+		}
+	}
+}
+
 void AMPCharacter::Move(const FInputActionValue &Value)
 {
 	const FVector2D MovementVector = Value.Get<FVector2D>();

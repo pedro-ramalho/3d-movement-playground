@@ -241,6 +241,7 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 		if (CustomMovementType == EMPCustomMovementMode::Slide)
 		{
 			bWantsToCrouch = false;
+			bWantsToSlide = false;
 		}
 	}
 	

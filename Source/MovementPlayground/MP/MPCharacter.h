@@ -10,6 +10,7 @@ class UMPCharacterMovementComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UAnimMontage;
 
 struct FInputActionValue;
 
@@ -27,6 +28,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCameraComponent> FollowCamera;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
+	TObjectPtr<UAnimMontage> SlideExitMontage;
 
 	/** Camera Boom and Follow Camera Setup */
 	void SetupCameraBoom();
@@ -66,6 +70,8 @@ public:
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	
+	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
 	
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoMove(float Right, float Forward);
