@@ -47,6 +47,9 @@ public:
 	virtual bool CanAttemptJump() const override;
 	
 	bool IsCustomMovementMode(EMPCustomMovementMode Mode) const;
+	
+	UFUNCTION(BlueprintPure, Category = "MP|Movement")
+	bool IsSliding() const;
 
 	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);
 	

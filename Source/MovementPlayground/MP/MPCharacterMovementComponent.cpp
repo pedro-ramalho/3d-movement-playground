@@ -204,6 +204,11 @@ bool UMPCharacterMovementComponent::IsCustomMovementMode(EMPCustomMovementMode M
 	return Mode == CustomMovementType;
 }
 
+bool UMPCharacterMovementComponent::IsSliding() const
+{
+	return IsCustomMovementMode(EMPCustomMovementMode::Slide);
+}
+
 FString UMPCharacterMovementComponent::MovementModeToString(EMovementMode Mode, uint8 CustomMode)
 {
 	if (Mode != MOVE_Custom)
