@@ -42,7 +42,10 @@ public:
 	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);
 	
 	void SetWantsToSlide(bool bWants);
-	
+
+	/** Would a standing capsule fit here, keeping the feet where they are? */
+	bool CanStandUp() const;
+
 protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
 	

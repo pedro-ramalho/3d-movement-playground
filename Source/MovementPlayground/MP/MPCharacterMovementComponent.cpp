@@ -3,6 +3,7 @@
 #include "MP/MPCharacterMovementComponent.h"
 #include "MP/MPMovementTypes.h"
 #include "GameFramework/Character.h"
+#include "Components/CapsuleComponent.h"
 
 DEFINE_LOG_CATEGORY(LogMPMovement);
 
@@ -56,6 +57,44 @@ void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float Del
 void UMPCharacterMovementComponent::SetWantsToSlide(bool bWants)
 {
 	bWantsToSlide = bWants;
+}
+
+bool UMPCharacterMovementComponent::CanStandUp() const
+{
+	if (!HasValidData())
+	{
+		return false;
+	}
+
+	// Same test as UCharacterMovementComponent::UnCrouch, for the bCrouchMaintainsBaseLocation case
+	const UCapsuleComponent* Capsule = CharacterOwner->GetCapsuleComponent();
+	const ACharacter* DefaultCharacter = CharacterOwner->GetClass()->GetDefaultObject<ACharacter>();
+
+	const float HalfHeightAdjust = DefaultCharacter->GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() - Capsule->GetUnscaledCapsuleHalfHeight();
+	const float ScaledHalfHeightAdjust = HalfHeightAdjust * Capsule->GetShapeScale();
+
+	// Slightly taller than standing, so a ceiling at exactly standing height still blocks
+	const float SweepInflation = UE_KINDA_SMALL_NUMBER * 10.f;
+	const FCollisionShape StandingCapsuleShape = GetPawnCapsuleCollisionShape(SHRINK_HeightCustom, -SweepInflation - ScaledHalfHeightAdjust);
+
+	// The feet stay put, so the standing capsule's center sits higher than the current one
+	const FVector StandingLocation = UpdatedComponent->GetComponentLocation()
+		+ (StandingCapsuleShape.GetCapsuleHalfHeight() - Capsule->GetScaledCapsuleHalfHeight()) * -GetGravityDirection();
+
+	FCollisionQueryParams CapsuleParams(SCENE_QUERY_STAT(MPStandUpTest), false, CharacterOwner);
+	FCollisionResponseParams ResponseParams;
+	InitCollisionParams(CapsuleParams, ResponseParams);
+
+	const bool bBlocked = GetWorld()->OverlapBlockingTestByChannel(
+		StandingLocation,
+		GetWorldToGravityTransform(),
+		UpdatedComponent->GetCollisionObjectType(),
+		StandingCapsuleShape,
+		CapsuleParams,
+		ResponseParams
+	);
+
+	return !bBlocked;
 }
 
 void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)

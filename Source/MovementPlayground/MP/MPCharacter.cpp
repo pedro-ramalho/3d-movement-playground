@@ -4,12 +4,16 @@
 #include "MP/MPCharacter.h"
 
 #include "EnhancedInputComponent.h"
+#include "Animation/AnimInstance.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
 #include "MP/MPMovementTypes.h"
 #include "MP/MPCharacterMovementComponent.h"
+
+const FName AMPCharacter::SlideGetUpNotifyName(TEXT("GetUp"));
 
 AMPCharacter::AMPCharacter(const FObjectInitializer& ObjectInitializer) : Super(
 	ObjectInitializer.SetDefaultSubobjectClass<UMPCharacterMovementComponent>(CharacterMovementComponentName))
@@ -26,6 +30,36 @@ AMPCharacter::AMPCharacter(const FObjectInitializer& ObjectInitializer) : Super(
 	
 	SetupCameraBoom();
 	SetupFollowCamera();
+}
+
+void AMPCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+	{
+		AnimInstance->OnPlayMontageNotifyBegin.AddDynamic(this, &AMPCharacter::OnMontageNotifyBegin);
+	}
+}
+
+void AMPCharacter::OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload)
+{
+	if (NotifyName != SlideGetUpNotifyName || !GetMPMovement()->IsSliding())
+	{
+		return;
+	}
+
+	// Room to stand: let the montage play its get-up
+	if (GetMPMovement()->CanStandUp())
+	{
+		return;
+	}
+
+	// Under a ceiling: skip the get-up. End the slide now instead of when the blend-out finishes,
+	// so the montage blends out into the crouch pose, not the standing one.
+	// The engine then keeps the capsule crouched until there is room to stand.
+	StopAnimMontage(SlideMontage);
+	GetMPMovement()->SetMovementMode(MOVE_Walking);
 }
 
 void AMPCharacter::SetupCameraBoom()

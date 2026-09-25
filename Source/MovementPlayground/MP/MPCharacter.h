@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Animation/AnimNotifies/AnimNotify.h"
 #include "MPCharacter.generated.h"
 
 class UMPCharacterMovementComponent;
@@ -36,8 +37,17 @@ private:
 	void SetupCameraBoom();
 	
 	void SetupFollowCamera();
-	
+
+	/** Name of the Montage Notify in the slide montage where the get-up begins */
+	static const FName SlideGetUpNotifyName;
+
+	/** Receives the Montage Notifies of every montage this character plays */
+	UFUNCTION()
+	void OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload);
+
 protected:
+	virtual void BeginPlay() override;
+
 	/** Jump Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> JumpAction;
