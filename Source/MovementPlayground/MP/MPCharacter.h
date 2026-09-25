@@ -30,7 +30,7 @@ private:
 	TObjectPtr<UCameraComponent> FollowCamera;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
-	TObjectPtr<UAnimMontage> SlideExitMontage;
+	TObjectPtr<UAnimMontage> SlideMontage;
 
 	/** Camera Boom and Follow Camera Setup */
 	void SetupCameraBoom();

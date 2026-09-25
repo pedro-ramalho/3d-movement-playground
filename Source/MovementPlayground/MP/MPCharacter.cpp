@@ -65,14 +65,19 @@ void AMPCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 P
 {
 	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
 	
+	if (GetMPMovement()->IsSliding())
+	{
+		PlayAnimMontage(SlideMontage);
+	}
+	
 	if (PrevMovementMode == MOVE_Custom)
 	{
 		EMPCustomMovementMode PrevCustomType = static_cast<EMPCustomMovementMode>(PreviousCustomMode);
-		if (PrevCustomType == EMPCustomMovementMode::Slide && GetCharacterMovement()->MovementMode == MOVE_Walking)
+		if (PrevCustomType == EMPCustomMovementMode::Slide && GetCharacterMovement()->MovementMode == MOVE_Falling)
 		{
-			if (SlideExitMontage)
+			if (SlideMontage)
 			{
-				PlayAnimMontage(SlideExitMontage);
+				StopAnimMontage(SlideMontage);
 			}
 		}
 	}

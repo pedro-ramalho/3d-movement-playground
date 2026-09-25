@@ -2,6 +2,7 @@
 
 #include "MP/MPCharacterMovementComponent.h"
 #include "MP/MPMovementTypes.h"
+#include "GameFramework/Character.h"
 
 DEFINE_LOG_CATEGORY(LogMPMovement);
 
@@ -118,43 +119,32 @@ void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations
 
 void UMPCharacterMovementComponent::PhysSlide(float deltaTime, int32 Iterations)
 {
-	const float Gravity = GetGravityZ();
-	
-	const FVector GravityVector = FVector(0.f, 0.f, Gravity);
-	
 	float RemainingTime = deltaTime;
-	
+
 	while (RemainingTime >= MIN_TICK_TIME && Iterations < MaxSimulationIterations)
 	{
 		Iterations++;
 		const float TimeTick = GetSimulationTimeStep(RemainingTime, Iterations);
 		RemainingTime -= TimeTick;
-		
-		if (Velocity.Size() <= SlideExitSpeed || !bWantsToSlide)
+
+		// The slide lasts exactly as long as the slide montage; its root motion sets Velocity before we get here
+		if (!CharacterOwner || !CharacterOwner->IsPlayingRootMotion())
 		{
 			SetMovementMode(MOVE_Walking);
 			StartNewPhysics(RemainingTime, Iterations);
-			
+
 			return;
 		}
-		
+
+		// Keep the animation's speed, but make it follow the floor so slides go up and down ramps
 		FVector Direction = Velocity.GetSafeNormal();
-		
+
 		if (CurrentFloor.IsWalkableFloor())
 		{
-			const FVector SlopeAccelerationVector = FVector::VectorPlaneProject(
-				GravityVector, CurrentFloor.HitResult.ImpactNormal
-				) * SlideGravityScale;
-		
-			Velocity += TimeTick * SlopeAccelerationVector;
-		
-			Direction = FVector::VectorPlaneProject(Velocity.GetSafeNormal(), CurrentFloor.HitResult.ImpactNormal).GetSafeNormal();
+			Direction = FVector::VectorPlaneProject(Direction, CurrentFloor.HitResult.ImpactNormal).GetSafeNormal();
 		}
-	
-		const float SpeedValue = Velocity.Size() - (TimeTick * SlideDeceleration);
-		const float Speed = FMath::Clamp(SpeedValue, 0.0f, SlideMaxSpeed);
-	
-		Velocity = Direction * Speed;
+
+		Velocity = Direction * Velocity.Size();
 	
 		const FVector Delta = Velocity * TimeTick;
 		const FQuat Rotation = UpdatedComponent->GetComponentQuat();
@@ -188,8 +178,9 @@ bool UMPCharacterMovementComponent::IsMovingOnGround() const
 
 bool UMPCharacterMovementComponent::CanAttemptJump() const
 {
+	// No jumping out of the root-motion slide (for now)
 	if (IsCustomMovementMode(EMPCustomMovementMode::Slide))
-		return IsJumpAllowed();
+		return false;
 	
 	return Super::CanAttemptJump();
 }
