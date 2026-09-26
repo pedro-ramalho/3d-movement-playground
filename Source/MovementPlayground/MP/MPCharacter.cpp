@@ -10,6 +10,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
+#include "Animation/AnimMontage.h"
 #include "MP/MPMovementTypes.h"
 #include "MP/MPCharacterMovementComponent.h"
 
@@ -111,6 +112,14 @@ void AMPCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 P
 		{
 			if (SlideMontage)
 			{
+				if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+				{
+					if (FAnimMontageInstance* MontageInstance = AnimInstance->GetActiveInstanceForMontage(SlideMontage))
+					{
+						MontageInstance->PushDisableRootMotion();
+					}
+				}
+				
 				StopAnimMontage(SlideMontage);
 			}
 		}

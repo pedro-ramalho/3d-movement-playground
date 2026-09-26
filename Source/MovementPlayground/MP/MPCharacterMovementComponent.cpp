@@ -217,9 +217,8 @@ bool UMPCharacterMovementComponent::IsMovingOnGround() const
 
 bool UMPCharacterMovementComponent::CanAttemptJump() const
 {
-	// No jumping out of the root-motion slide (for now)
 	if (IsCustomMovementMode(EMPCustomMovementMode::Slide))
-		return false;
+		return IsJumpAllowed() && CanStandUp();
 	
 	return Super::CanAttemptJump();
 }
