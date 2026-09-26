@@ -41,6 +41,28 @@ void AMPCharacter::BeginPlay()
 	{
 		AnimInstance->OnPlayMontageNotifyBegin.AddDynamic(this, &AMPCharacter::OnMontageNotifyBegin);
 	}
+
+	if (SlideMontage)
+	{
+		constexpr float SampleStep = 1.f / 30.f;
+		const float Length = SlideMontage->GetPlayLength();
+
+		for (float Start = 0.f; Start < Length; Start += SampleStep)
+		{
+			const float End = FMath::Min(Start + SampleStep, Length);
+			const float SliceTime = End - Start;
+
+			if (SliceTime < UE_KINDA_SMALL_NUMBER)
+			{
+				break;
+			}
+
+			const FTransform RootMotion = SlideMontage->ExtractRootMotionFromTrackRange(Start, End, FAnimExtractContext());
+			const float SliceSpeed = RootMotion.GetTranslation().Size2D() / SliceTime * SlideMontage->RateScale;
+
+			SlideMontagePeakSpeed = FMath::Max(SlideMontagePeakSpeed, SliceSpeed);
+		}
+	}
 }
 
 void AMPCharacter::OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload)
@@ -50,15 +72,11 @@ void AMPCharacter::OnMontageNotifyBegin(FName NotifyName, const FBranchingPointN
 		return;
 	}
 
-	// Room to stand: let the montage play its get-up
 	if (GetMPMovement()->CanStandUp())
 	{
 		return;
 	}
 
-	// Under a ceiling: skip the get-up. End the slide now instead of when the blend-out finishes,
-	// so the montage blends out into the crouch pose, not the standing one.
-	// The engine then keeps the capsule crouched until there is room to stand.
 	StopAnimMontage(SlideMontage);
 	GetMPMovement()->SetMovementMode(MOVE_Walking);
 }
@@ -102,13 +120,26 @@ void AMPCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 P
 	
 	if (GetMPMovement()->IsSliding())
 	{
+		const float EntrySpeed = GetVelocity().Size2D();
+		float RootMotionScale = 1.f;
+
+		if (SlideMontagePeakSpeed > UE_KINDA_SMALL_NUMBER)
+		{
+			RootMotionScale = FMath::Clamp(EntrySpeed * SlideSpeedMultiplier / SlideMontagePeakSpeed, SlideRootMotionScaleMin, SlideRootMotionScaleMax);
+		}
+
+		SetAnimRootMotionTranslationScale(RootMotionScale);
+
+		UE_LOG(LogMPMovement, Log, TEXT("Slide entry: %.0f cm/s, root motion scale %.2f"), EntrySpeed, RootMotionScale);
+
 		PlayAnimMontage(SlideMontage);
 	}
-	
-	if (PrevMovementMode == MOVE_Custom)
+
+	if (PrevMovementMode == MOVE_Custom && static_cast<EMPCustomMovementMode>(PreviousCustomMode) == EMPCustomMovementMode::Slide)
 	{
-		EMPCustomMovementMode PrevCustomType = static_cast<EMPCustomMovementMode>(PreviousCustomMode);
-		if (PrevCustomType == EMPCustomMovementMode::Slide && GetCharacterMovement()->MovementMode == MOVE_Falling)
+		SetAnimRootMotionTranslationScale(1.f);
+
+		if (GetCharacterMovement()->MovementMode == MOVE_Falling)
 		{
 			if (SlideMontage)
 			{

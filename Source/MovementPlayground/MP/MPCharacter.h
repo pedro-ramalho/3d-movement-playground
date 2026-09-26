@@ -32,6 +32,18 @@ private:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
 	TObjectPtr<UAnimMontage> SlideMontage;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide")
+	float SlideSpeedMultiplier = 1.2f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.1"))
+	float SlideRootMotionScaleMin = 0.5f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.1"))
+	float SlideRootMotionScaleMax = 2.5f;
+
+	/** Measured from SlideMontage in BeginPlay, not tuned */
+	float SlideMontagePeakSpeed = 0.f;
 
 	/** Camera Boom and Follow Camera Setup */
 	void SetupCameraBoom();
