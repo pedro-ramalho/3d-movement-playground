@@ -37,6 +37,12 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "deg"))
 	float WallRunMaxSurfaceTilt = 15.f;
 	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run")
+	float WallRunGravityScale = 0.3f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run")
+	float WallRunStickSpeed = 200.f;
+	
 	FVector WallRunNormal = FVector::ZeroVector;
 	
 	float WallRunStartTime = 0.f;
@@ -68,6 +74,8 @@ protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
 	
 	void PhysSlide(float deltaTime, int32 Iterations);
+	
+	void PhysWallRun(float deltaTime, int32 Iterations);
 	
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	

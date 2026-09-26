@@ -169,6 +169,10 @@ void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations
 	case EMPCustomMovementMode::Slide:
 		PhysSlide(deltaTime, Iterations);
 		break;
+		
+	case EMPCustomMovementMode::WallRun:
+		PhysWallRun(deltaTime, Iterations);
+		break;
 	
 	default:
 		break;
@@ -222,6 +226,52 @@ void UMPCharacterMovementComponent::PhysSlide(float deltaTime, int32 Iterations)
 			StartNewPhysics(RemainingTime, Iterations);
 			
 			return;
+		}
+	}
+}
+
+void UMPCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iterations)
+{
+	float RemainingTime = deltaTime;
+	
+	while (RemainingTime >= MIN_TICK_TIME && Iterations < MaxSimulationIterations)
+	{
+		Iterations++;
+		const float TimeTick = GetSimulationTimeStep(RemainingTime, Iterations);
+		
+		const float TraceLength = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius() + WallRunTraceDistance;
+		const FVector Start = UpdatedComponent->GetComponentLocation();
+		const FVector End = Start - WallRunNormal * TraceLength;
+		
+		FCollisionQueryParams CollisionParams(SCENE_QUERY_STAT(PhysWallRun), false, CharacterOwner);
+		FHitResult WallHit;
+		
+		if (!GetWorld()->LineTraceSingleByChannel(WallHit, Start, End, ECC_WallRun, CollisionParams))
+		{
+			SetMovementMode(MOVE_Falling);
+			StartNewPhysics(RemainingTime, Iterations);
+			
+			return;
+		}
+		RemainingTime -= TimeTick;
+		
+		WallRunNormal = WallHit.ImpactNormal.GetSafeNormal();
+		
+		const FVector HVelocity(Velocity.X, Velocity.Y, 0.f);
+		const FVector AlongWall = FVector::VectorPlaneProject(HVelocity, WallRunNormal).GetSafeNormal();
+		const float NewVelocityZ = Velocity.Z + GetGravityZ() * WallRunGravityScale * TimeTick;
+		
+		Velocity = AlongWall * HVelocity.Size();
+		Velocity.Z = NewVelocityZ;
+		
+		const FVector Delta = (Velocity - WallRunNormal * WallRunStickSpeed) * TimeTick;
+		
+		FHitResult MoveHit;
+		SafeMoveUpdatedComponent(Delta, UpdatedComponent->GetComponentQuat(), true, MoveHit);
+		
+		if (MoveHit.IsValidBlockingHit())
+		{
+			SlideAlongSurface(Delta, 1.f - MoveHit.Time, MoveHit.Normal, MoveHit, true);
 		}
 	}
 }
