@@ -55,6 +55,12 @@ void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float Del
 	
 	FHitResult WallHit;
 	bHasWallCandidate = MovementMode == MOVE_Falling && FindRunnableWall(WallHit);
+	if (bHasWallCandidate)
+	{
+		WallRunNormal = WallHit.ImpactNormal.GetSafeNormal2D();
+		SetMovementMode(MOVE_Custom, static_cast<uint8>(EMPCustomMovementMode::WallRun));
+	}
+	
 	
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
 }
@@ -274,6 +280,17 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 		
 		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
 		AdjustFloorHeight();
+	}
+	
+	if (IsCustomMovementMode(EMPCustomMovementMode::WallRun))
+	{
+		FVector HVelocity = Velocity;
+		HVelocity.Z = 0.f;
+			
+		const FVector AlongWall = FVector::VectorPlaneProject(HVelocity, WallRunNormal).GetSafeNormal();
+		Velocity = AlongWall * HVelocity.Size();
+			
+		WallRunStartTime = GetWorld()->GetTimeSeconds();
 	}
 	
 	if (PreviousMovementMode == MOVE_Custom)

@@ -37,6 +37,10 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "deg"))
 	float WallRunMaxSurfaceTilt = 15.f;
 	
+	FVector WallRunNormal = FVector::ZeroVector;
+	
+	float WallRunStartTime = 0.f;
+	
 public:
 	UMPCharacterMovementComponent();
 	
