@@ -40,8 +40,17 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run")
 	float WallRunGravityScale = 0.3f;
 	
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run")
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s"))
 	float WallRunStickSpeed = 200.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "s"))
+	float WallRunMaxDuration = 1.5f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float WallRunSteerAwayThreshold = 0.5f;
+	
+	TWeakObjectPtr<const UPrimitiveComponent> CurrentWall;
+	TWeakObjectPtr<const UPrimitiveComponent> LastWall;
 	
 	FVector WallRunNormal = FVector::ZeroVector;
 	

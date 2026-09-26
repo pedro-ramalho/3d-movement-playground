@@ -58,6 +58,7 @@ void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float Del
 	if (bHasWallCandidate)
 	{
 		WallRunNormal = WallHit.ImpactNormal.GetSafeNormal2D();
+		CurrentWall = WallHit.GetComponent();
 		SetMovementMode(MOVE_Custom, static_cast<uint8>(EMPCustomMovementMode::WallRun));
 	}
 	
@@ -253,9 +254,22 @@ void UMPCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iteration
 			
 			return;
 		}
+		
+		const bool bIsTimerExpired = GetWorld()->GetTimeSeconds() - WallRunStartTime >= WallRunMaxDuration;
+		const bool bIsTooSlow = Velocity.Size2D() < WallRunMinSpeed;
+		const bool bIsSteeringAway = FVector::DotProduct(Acceleration.GetSafeNormal2D(), WallRunNormal) > WallRunSteerAwayThreshold;
+
+		if (bIsTimerExpired || bIsTooSlow || bIsSteeringAway)
+		{
+			SetMovementMode(MOVE_Falling);
+			StartNewPhysics(RemainingTime, Iterations);
+			
+			return;
+		}
+		
 		RemainingTime -= TimeTick;
 		
-		WallRunNormal = WallHit.ImpactNormal.GetSafeNormal();
+		WallRunNormal = WallHit.ImpactNormal.GetSafeNormal2D();
 		
 		const FVector HVelocity(Velocity.X, Velocity.Y, 0.f);
 		const FVector AlongWall = FVector::VectorPlaneProject(HVelocity, WallRunNormal).GetSafeNormal();
@@ -272,6 +286,16 @@ void UMPCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iteration
 		if (MoveHit.IsValidBlockingHit())
 		{
 			SlideAlongSurface(Delta, 1.f - MoveHit.Time, MoveHit.Normal, MoveHit, true);
+		}
+
+		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
+
+		if (CurrentFloor.IsWalkableFloor() && Velocity.Z <= 0.f)
+		{
+			SetMovementMode(MOVE_Walking);
+			StartNewPhysics(RemainingTime, Iterations);
+
+			return;
 		}
 	}
 }
@@ -352,7 +376,13 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 			bWantsToCrouch = false;
 			bWantsToSlide = false;
 		}
+		
+		if (CustomMovementType == EMPCustomMovementMode::WallRun)
+			LastWall = CurrentWall;
 	}
+	
+	if (MovementMode == MOVE_Walking)
+		LastWall.Reset();
 	
 	UE_LOG(LogMPMovement, Log, TEXT("From %s to %s"),
 		*MovementModeToString(PreviousMovementMode, PreviousCustomMode),
@@ -401,7 +431,7 @@ bool UMPCharacterMovementComponent::FindRunnableWall(FHitResult& OutWallHit) con
 	const bool bUseA = bHitA && (!bHitB || HitA.Distance <= HitB.Distance);
 	const FHitResult& WallHit = bUseA ? HitA : HitB;
 
-	bool bRunnable = bHitA || bHitB;
+	bool bRunnable = (bHitA || bHitB) && WallHit.GetComponent() != LastWall.Get();
 
 	if (bRunnable)
 	{
