@@ -313,6 +313,9 @@ bool UMPCharacterMovementComponent::CanAttemptJump() const
 	if (IsCustomMovementMode(EMPCustomMovementMode::Slide))
 		return IsJumpAllowed() && CanStandUp();
 	
+	if (IsCustomMovementMode(EMPCustomMovementMode::WallRun))
+		return IsJumpAllowed();
+		
 	return Super::CanAttemptJump();
 }
 
@@ -324,6 +327,21 @@ bool UMPCharacterMovementComponent::IsCustomMovementMode(EMPCustomMovementMode M
 	EMPCustomMovementMode CustomMovementType = static_cast<EMPCustomMovementMode>(CustomMovementMode);
 	
 	return Mode == CustomMovementType;
+}
+
+bool UMPCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime)
+{
+	if (IsCustomMovementMode(EMPCustomMovementMode::WallRun) && CharacterOwner && CharacterOwner->CanJump())
+	{
+		const FVector AlongWall(Velocity.X, Velocity.Y, 0.f);
+		
+		Velocity = AlongWall + WallRunNormal * WallJumpOutSpeed + FVector::UpVector * WallJumpUpSpeed;
+		SetMovementMode(MOVE_Falling);
+		
+		return true;
+	}
+	
+	return Super::DoJump(bReplayingMoves, DeltaTime);
 }
 
 bool UMPCharacterMovementComponent::IsSliding() const

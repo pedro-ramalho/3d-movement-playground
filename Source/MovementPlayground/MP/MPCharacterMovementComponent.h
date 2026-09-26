@@ -49,6 +49,12 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float WallRunSteerAwayThreshold = 0.5f;
 	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s"))
+	float WallJumpOutSpeed = 500.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s"))
+	float WallJumpUpSpeed = 500.f;
+	
 	TWeakObjectPtr<const UPrimitiveComponent> CurrentWall;
 	TWeakObjectPtr<const UPrimitiveComponent> LastWall;
 	
@@ -66,6 +72,8 @@ public:
 	virtual bool IsMovingOnGround() const override;
 	
 	virtual bool CanAttemptJump() const override;
+	
+	virtual bool DoJump(bool bReplayingMoves, float DeltaTime) override;
 	
 	bool IsCustomMovementMode(EMPCustomMovementMode Mode) const;
 	
