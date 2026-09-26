@@ -349,6 +349,29 @@ bool UMPCharacterMovementComponent::IsSliding() const
 	return IsCustomMovementMode(EMPCustomMovementMode::Slide);
 }
 
+bool UMPCharacterMovementComponent::IsWallRunning() const
+{
+	return IsCustomMovementMode(EMPCustomMovementMode::WallRun);
+}
+
+float UMPCharacterMovementComponent::GetWallRunSide() const
+{
+	if (!IsWallRunning() || !CharacterOwner)
+		return 0.f;
+	
+	const float Product = FVector::DotProduct(WallRunNormal, CharacterOwner->GetActorRightVector());
+	
+	return Product > 0.f ? -1.f : 1.f;
+}
+
+FRotator UMPCharacterMovementComponent::ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const
+{
+	if (IsWallRunning() && !Velocity.IsNearlyZero())
+		return Velocity.GetSafeNormal2D().Rotation();
+	
+	return Super::ComputeOrientToMovementRotation(CurrentRotation, DeltaTime, DeltaRotation);
+}
+
 FString UMPCharacterMovementComponent::MovementModeToString(EMovementMode Mode, uint8 CustomMode)
 {
 	if (Mode != MOVE_Custom)

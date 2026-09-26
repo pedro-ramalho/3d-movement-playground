@@ -79,7 +79,15 @@ public:
 	
 	UFUNCTION(BlueprintPure, Category = "MP|Movement")
 	bool IsSliding() const;
-
+	
+	UFUNCTION(BlueprintPure, Category = "MP|Movement")
+	bool IsWallRunning() const;
+	
+	UFUNCTION(BlueprintPure, Category = "MP|Movement")
+	float GetWallRunSide() const;
+	
+	virtual FRotator ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const override;
+	
 	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);
 	
 	void SetWantsToSlide(bool bWants);
