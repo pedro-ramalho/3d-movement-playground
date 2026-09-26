@@ -1,6 +1,9 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
 #include "MP/MPCharacterMovementComponent.h"
+#include "MP/MPMovementTypes.h"
+#include "GameFramework/Character.h"
+#include "Components/CapsuleComponent.h"
 
 DEFINE_LOG_CATEGORY(LogMPMovement);
 
@@ -13,6 +16,10 @@ static TAutoConsoleVariable<int32> CVarMPDebugMovement(
 
 UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 {
+	NavAgentProps.bCanCrouch = true;
+	
+	bWantsToSlide = false;
+	
 	// Rotation properties
 	bOrientRotationToMovement = true;
 	RotationRate = FRotator(0.0f, 500.0f, 0.0f);
@@ -24,13 +31,71 @@ UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 	
 	// Walking properties
 	MaxWalkSpeed = 500.f;
+	MaxWalkSpeedCrouched = 100.f;
 	MinAnalogWalkSpeed = 20.f;
 	BrakingDecelerationWalking = 2000.f;
 }
 
 void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
 {
+	// Are we in walking mode?
+	if (MovementMode == MOVE_Walking)
+	{
+		// Do we want to slide?
+		if (bWantsToSlide)
+		{
+			// Do we have enough speed to slide?
+			if (Velocity.Size2D() >= SlideEnterSpeed)
+			{
+				SetMovementMode(MOVE_Custom, static_cast<uint8>(EMPCustomMovementMode::Slide));
+			}
+		}
+	}
+	
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
+}
+
+void UMPCharacterMovementComponent::SetWantsToSlide(bool bWants)
+{
+	bWantsToSlide = bWants;
+}
+
+bool UMPCharacterMovementComponent::CanStandUp() const
+{
+	if (!HasValidData())
+	{
+		return false;
+	}
+
+	// Same test as UCharacterMovementComponent::UnCrouch, for the bCrouchMaintainsBaseLocation case
+	const UCapsuleComponent* Capsule = CharacterOwner->GetCapsuleComponent();
+	const ACharacter* DefaultCharacter = CharacterOwner->GetClass()->GetDefaultObject<ACharacter>();
+
+	const float HalfHeightAdjust = DefaultCharacter->GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() - Capsule->GetUnscaledCapsuleHalfHeight();
+	const float ScaledHalfHeightAdjust = HalfHeightAdjust * Capsule->GetShapeScale();
+
+	// Slightly taller than standing, so a ceiling at exactly standing height still blocks
+	const float SweepInflation = UE_KINDA_SMALL_NUMBER * 10.f;
+	const FCollisionShape StandingCapsuleShape = GetPawnCapsuleCollisionShape(SHRINK_HeightCustom, -SweepInflation - ScaledHalfHeightAdjust);
+
+	// The feet stay put, so the standing capsule's center sits higher than the current one
+	const FVector StandingLocation = UpdatedComponent->GetComponentLocation()
+		+ (StandingCapsuleShape.GetCapsuleHalfHeight() - Capsule->GetScaledCapsuleHalfHeight()) * -GetGravityDirection();
+
+	FCollisionQueryParams CapsuleParams(SCENE_QUERY_STAT(MPStandUpTest), false, CharacterOwner);
+	FCollisionResponseParams ResponseParams;
+	InitCollisionParams(CapsuleParams, ResponseParams);
+
+	const bool bBlocked = GetWorld()->OverlapBlockingTestByChannel(
+		StandingLocation,
+		GetWorldToGravityTransform(),
+		UpdatedComponent->GetCollisionObjectType(),
+		StandingCapsuleShape,
+		CapsuleParams,
+		ResponseParams
+	);
+
+	return !bBlocked;
 }
 
 void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
@@ -45,12 +110,14 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 
 	constexpr int32 ModeKey = 1;
 	constexpr int32 SpeedKey = 2;
+	constexpr int32 SlideKey = 3;
+	constexpr int32 CrouchKey = 4;
 
 	GEngine->AddOnScreenDebugMessage(
 		ModeKey,
 		0.f,
 		FColor::Cyan,
-		FString::Printf(TEXT("Mode: %s (%d)"), *UEnum::GetValueAsString(MovementMode), CustomMovementMode)
+		FString::Printf(TEXT("Current mode: %s"), *MovementModeToString(MovementMode, CustomMovementMode))
 	);
 
 	GEngine->AddOnScreenDebugMessage(
@@ -59,25 +126,157 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 		FColor::Cyan,
 		FString::Printf(TEXT("Horizontal speed: %.0f cm/s"), Velocity.Size2D())
 	);
+	
+	GEngine->AddOnScreenDebugMessage(
+		SlideKey,
+		0.f,
+		FColor::Cyan,
+		FString::Printf(TEXT("Wants to slide: %s"), bWantsToSlide ? TEXT("yes") : TEXT("no"))
+	);
+	
+	GEngine->AddOnScreenDebugMessage(
+		CrouchKey,
+		0.f,
+		FColor::Cyan,
+		FString::Printf(TEXT("Crouched: %s"), IsCrouching() ? TEXT("yes") : TEXT("no"))
+	);
+	
 #endif
 }
 
 void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations)
 {
+	switch (static_cast<EMPCustomMovementMode>(CustomMovementMode))
+	{
+	case EMPCustomMovementMode::Slide:
+		PhysSlide(deltaTime, Iterations);
+		break;
 	
+	default:
+		break;
+	}
+}
+
+void UMPCharacterMovementComponent::PhysSlide(float deltaTime, int32 Iterations)
+{
+	float RemainingTime = deltaTime;
+
+	while (RemainingTime >= MIN_TICK_TIME && Iterations < MaxSimulationIterations)
+	{
+		Iterations++;
+		const float TimeTick = GetSimulationTimeStep(RemainingTime, Iterations);
+		RemainingTime -= TimeTick;
+
+		// The slide lasts exactly as long as the slide montage; its root motion sets Velocity before we get here
+		if (!CharacterOwner || !CharacterOwner->IsPlayingRootMotion())
+		{
+			SetMovementMode(MOVE_Walking);
+			StartNewPhysics(RemainingTime, Iterations);
+
+			return;
+		}
+
+		// Keep the animation's speed, but make it follow the floor so slides go up and down ramps
+		FVector Direction = Velocity.GetSafeNormal();
+
+		if (CurrentFloor.IsWalkableFloor())
+		{
+			Direction = FVector::VectorPlaneProject(Direction, CurrentFloor.HitResult.ImpactNormal).GetSafeNormal();
+		}
+
+		Velocity = Direction * Velocity.Size();
+	
+		const FVector Delta = Velocity * TimeTick;
+		const FQuat Rotation = UpdatedComponent->GetComponentQuat();
+		FHitResult Hit;
+	
+		SafeMoveUpdatedComponent(Delta, Rotation, true, Hit);
+	
+		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
+	
+		if (CurrentFloor.IsWalkableFloor())
+		{
+			AdjustFloorHeight();
+		}
+		else
+		{
+			SetMovementMode(MOVE_Falling);
+			StartNewPhysics(RemainingTime, Iterations);
+			
+			return;
+		}
+	}
+}
+
+bool UMPCharacterMovementComponent::IsMovingOnGround() const
+{
+	if (IsCustomMovementMode(EMPCustomMovementMode::Slide))
+		return true;
+	
+	return Super::IsMovingOnGround();
+}
+
+bool UMPCharacterMovementComponent::CanAttemptJump() const
+{
+	if (IsCustomMovementMode(EMPCustomMovementMode::Slide))
+		return IsJumpAllowed() && CanStandUp();
+	
+	return Super::CanAttemptJump();
+}
+
+bool UMPCharacterMovementComponent::IsCustomMovementMode(EMPCustomMovementMode Mode) const
+{
+	if (MovementMode != MOVE_Custom)
+		return false;
+	
+	EMPCustomMovementMode CustomMovementType = static_cast<EMPCustomMovementMode>(CustomMovementMode);
+	
+	return Mode == CustomMovementType;
+}
+
+bool UMPCharacterMovementComponent::IsSliding() const
+{
+	return IsCustomMovementMode(EMPCustomMovementMode::Slide);
+}
+
+FString UMPCharacterMovementComponent::MovementModeToString(EMovementMode Mode, uint8 CustomMode)
+{
+	if (Mode != MOVE_Custom)
+	{
+		return UEnum::GetValueAsString(Mode);
+	}
+	
+	EMPCustomMovementMode CustomMovementType = static_cast<EMPCustomMovementMode>(CustomMode);
+	
+	return UEnum::GetValueAsString(CustomMovementType);
 }
 
 void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode)
 {
 	Super::OnMovementModeChanged(PreviousMovementMode, PreviousCustomMode);
 	
-	UE_LOG(
-		LogMPMovement,
-		Log,
-		TEXT("Mode: %s (%d) -> %s (%d)"),
-		*UEnum::GetValueAsString(PreviousMovementMode),
-		PreviousCustomMode,
-		*UEnum::GetValueAsString(MovementMode),
-		CustomMovementMode
+	if (IsCustomMovementMode(EMPCustomMovementMode::Slide))
+	{
+		bWantsToCrouch = true;
+		bCrouchMaintainsBaseLocation = true;
+		
+		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
+		AdjustFloorHeight();
+	}
+	
+	if (PreviousMovementMode == MOVE_Custom)
+	{
+		EMPCustomMovementMode CustomMovementType = static_cast<EMPCustomMovementMode>(PreviousCustomMode);
+		
+		if (CustomMovementType == EMPCustomMovementMode::Slide)
+		{
+			bWantsToCrouch = false;
+			bWantsToSlide = false;
+		}
+	}
+	
+	UE_LOG(LogMPMovement, Log, TEXT("From %s to %s"),
+		*MovementModeToString(PreviousMovementMode, PreviousCustomMode),
+		*MovementModeToString(MovementMode, CustomMovementMode)
 	);
 }

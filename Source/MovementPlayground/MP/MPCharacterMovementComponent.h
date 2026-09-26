@@ -6,6 +6,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "MPCharacterMovementComponent.generated.h"
 
+enum class EMPCustomMovementMode : uint8;
+
 DECLARE_LOG_CATEGORY_EXTERN(LogMPMovement, Log, All);
 
 /**
@@ -16,6 +18,11 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 {
 	GENERATED_BODY()
 	
+	bool bWantsToSlide;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s"))
+	float SlideEnterSpeed = 350.0f;
+
 public:
 	UMPCharacterMovementComponent();
 	
@@ -23,8 +30,27 @@ public:
 	
 	virtual void TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
 
+	virtual bool IsMovingOnGround() const override;
+	
+	virtual bool CanAttemptJump() const override;
+	
+	bool IsCustomMovementMode(EMPCustomMovementMode Mode) const;
+	
+	UFUNCTION(BlueprintPure, Category = "MP|Movement")
+	bool IsSliding() const;
+
+	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);
+	
+	void SetWantsToSlide(bool bWants);
+
+	/** Would a standing capsule fit here, keeping the feet where they are? */
+	bool CanStandUp() const;
+
 protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
 	
+	void PhysSlide(float deltaTime, int32 Iterations);
+	
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
+	
 };

@@ -4,12 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Animation/AnimNotifies/AnimNotify.h"
 #include "MPCharacter.generated.h"
 
 class UMPCharacterMovementComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UAnimMontage;
 
 struct FInputActionValue;
 
@@ -27,17 +29,44 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCameraComponent> FollowCamera;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
+	TObjectPtr<UAnimMontage> SlideMontage;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide")
+	float SlideSpeedMultiplier = 1.2f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.1"))
+	float SlideRootMotionScaleMin = 0.5f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.1"))
+	float SlideRootMotionScaleMax = 2.5f;
+
+	/** Measured from SlideMontage in BeginPlay, not tuned */
+	float SlideMontagePeakSpeed = 0.f;
 
 	/** Camera Boom and Follow Camera Setup */
 	void SetupCameraBoom();
 	
 	void SetupFollowCamera();
-	
+
+	/** Name of the Montage Notify in the slide montage where the get-up begins */
+	static const FName SlideGetUpNotifyName;
+
+	/** Receives the Montage Notifies of every montage this character plays */
+	UFUNCTION()
+	void OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload);
+
 protected:
+	virtual void BeginPlay() override;
+
 	/** Jump Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> JumpAction;
 
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> SlideAction;
+	
 	/** Move Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> MoveAction;
@@ -55,13 +84,16 @@ protected:
 	
 	/** Called for looking */
 	void Look(const FInputActionValue& Value);
-	
+
+	virtual bool CanJumpInternal_Implementation() const override;
 public:
 	// Sets default values for this character's properties
 	AMPCharacter(const FObjectInitializer& ObjectInitializer);
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	
+	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
 	
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoMove(float Right, float Forward);
@@ -74,6 +106,12 @@ public:
 	
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoJumpEnd();
+	
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoSlideStart();
+	
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoSlideEnd();
 	
 	FORCEINLINE UMPCharacterMovementComponent* GetMPMovement() const { return MPMovement; }
 	
