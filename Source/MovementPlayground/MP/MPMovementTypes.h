@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/EngineTypes.h"
 #include "MPMovementTypes.generated.h"
 
 UENUM(BlueprintType)
@@ -15,3 +16,4 @@ enum class EMPCustomMovementMode : uint8
 	Grapple UMETA(DisplayName="Grapple")
 };
 
+constexpr ECollisionChannel ECC_WallRun = ECC_GameTraceChannel1;
