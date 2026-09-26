@@ -20,9 +20,23 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	
 	bool bWantsToSlide;
 	
+	bool bHasWallCandidate = false;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s"))
 	float SlideEnterSpeed = 350.0f;
-
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s"))
+	float WallRunMinSpeed = 300.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm"))
+	float WallRunMinHeight = 60.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm"))
+	float WallRunTraceDistance = 30.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "deg"))
+	float WallRunMaxSurfaceTilt = 15.f;
+	
 public:
 	UMPCharacterMovementComponent();
 	
@@ -53,4 +67,5 @@ protected:
 	
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	
+	bool FindRunnableWall(FHitResult& OutWallHit) const;
 };

@@ -4,6 +4,7 @@
 #include "MP/MPMovementTypes.h"
 #include "GameFramework/Character.h"
 #include "Components/CapsuleComponent.h"
+#include "DrawDebugHelpers.h"
 
 DEFINE_LOG_CATEGORY(LogMPMovement);
 
@@ -51,6 +52,9 @@ void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float Del
 			}
 		}
 	}
+	
+	FHitResult WallHit;
+	bHasWallCandidate = MovementMode == MOVE_Falling && FindRunnableWall(WallHit);
 	
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
 }
@@ -112,6 +116,7 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 	constexpr int32 SpeedKey = 2;
 	constexpr int32 SlideKey = 3;
 	constexpr int32 CrouchKey = 4;
+	constexpr int32 WallRunKey = 5;
 
 	GEngine->AddOnScreenDebugMessage(
 		ModeKey,
@@ -139,6 +144,13 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 		0.f,
 		FColor::Cyan,
 		FString::Printf(TEXT("Crouched: %s"), IsCrouching() ? TEXT("yes") : TEXT("no"))
+	);
+	
+	GEngine->AddOnScreenDebugMessage(
+		WallRunKey,
+		0.f,
+		FColor::Cyan,
+		FString::Printf(TEXT("Wall candidate: %s"), bHasWallCandidate ? TEXT("yes") : TEXT("no"))
 	);
 	
 #endif
@@ -279,4 +291,83 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 		*MovementModeToString(PreviousMovementMode, PreviousCustomMode),
 		*MovementModeToString(MovementMode, CustomMovementMode)
 	);
+}
+
+bool UMPCharacterMovementComponent::FindRunnableWall(FHitResult& OutWallHit) const
+{
+	if (!HasValidData())
+		return false;
+
+	FVector HVelocity = Velocity;
+	HVelocity.Z = 0.f;
+
+	if (HVelocity.IsNearlyZero())
+		return false;
+
+	const FVector HDirection = HVelocity.GetSafeNormal();
+	const FVector PDirection = FVector::CrossProduct(FVector::UpVector, HDirection).GetSafeNormal();
+
+	const UCapsuleComponent* Capsule = CharacterOwner->GetCapsuleComponent();
+	const float CapsuleRadius = Capsule->GetScaledCapsuleRadius();
+	const float CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
+
+	const float TraceLength = CapsuleRadius + WallRunTraceDistance;
+
+	FCollisionQueryParams CollisionParams(SCENE_QUERY_STAT(FindRunnableWall), false, CharacterOwner);
+
+	const FVector Start = UpdatedComponent->GetComponentLocation();
+	const FVector EndA = Start + PDirection * TraceLength;
+	const FVector EndB = Start - PDirection * TraceLength;
+	
+	FHitResult HitA, HitB;
+	
+	const bool bHitA = GetWorld()->LineTraceSingleByChannel(HitA, Start, EndA, ECC_WallRun, CollisionParams);
+	const bool bHitB = GetWorld()->LineTraceSingleByChannel(HitB, Start, EndB, ECC_WallRun, CollisionParams);
+
+	const FVector DownStart = Start - FVector(0.f, 0.f, CapsuleHalfHeight);
+	const FVector DownEnd = DownStart - FVector(0.f, 0.f, WallRunMinHeight);
+
+	FHitResult FloorHit;
+	const bool bFloorHit = GetWorld()->LineTraceSingleByChannel(FloorHit, DownStart, DownEnd,
+		UpdatedComponent->GetCollisionObjectType(), CollisionParams);
+
+	const bool bUseA = bHitA && (!bHitB || HitA.Distance <= HitB.Distance);
+	const FHitResult& WallHit = bUseA ? HitA : HitB;
+
+	bool bRunnable = bHitA || bHitB;
+
+	if (bRunnable)
+	{
+		const float MaxNormalZ = FMath::Sin(FMath::DegreesToRadians(WallRunMaxSurfaceTilt));
+		const FVector AlongWallVelocity = FVector::VectorPlaneProject(HVelocity, WallHit.ImpactNormal);
+
+		bRunnable = FMath::Abs(WallHit.ImpactNormal.Z) <= MaxNormalZ
+			&& AlongWallVelocity.Size() >= WallRunMinSpeed
+			&& !bFloorHit;
+	}
+
+#if !UE_BUILD_SHIPPING
+	if (CVarMPDebugMovement.GetValueOnGameThread() != 0)
+	{
+		auto SideColor = [bRunnable](bool bHit, bool bChosen)
+		{
+			if (!bHit)
+				return FColor::Silver;
+
+			return (bRunnable && bChosen) ? FColor::Green : FColor::Red;
+		};
+
+		DrawDebugLine(GetWorld(), Start, bHitA ? HitA.ImpactPoint : EndA, SideColor(bHitA, bUseA), false, -1.f, 0, 1.5f);
+		DrawDebugLine(GetWorld(), Start, bHitB ? HitB.ImpactPoint : EndB, SideColor(bHitB, !bUseA), false, -1.f, 0, 1.5f);
+		DrawDebugLine(GetWorld(), DownStart, bFloorHit ? FloorHit.ImpactPoint : DownEnd,
+			bFloorHit ? FColor::Red : FColor::Green, false, -1.f, 0, 1.5f);
+	}
+#endif
+
+	if (bRunnable)
+	{
+		OutWallHit = WallHit;
+	}
+
+	return bRunnable;
 }
