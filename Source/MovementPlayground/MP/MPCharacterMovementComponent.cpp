@@ -31,6 +31,7 @@ UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 	
 	// Walking properties
 	MaxWalkSpeed = 500.f;
+	MaxWalkSpeedCrouched = 100.f;
 	MinAnalogWalkSpeed = 20.f;
 	BrakingDecelerationWalking = 2000.f;
 }

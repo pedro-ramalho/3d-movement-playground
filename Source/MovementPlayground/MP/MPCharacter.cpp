@@ -101,8 +101,8 @@ void AMPCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 {
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent))
 	{
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AMPCharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &AMPCharacter::StopJumping);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AMPCharacter::DoJumpStart);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &AMPCharacter::DoJumpEnd);
 		
 		EnhancedInputComponent->BindAction(SlideAction, ETriggerEvent::Started, this, &AMPCharacter::DoSlideStart);
 		EnhancedInputComponent->BindAction(SlideAction, ETriggerEvent::Completed, this, &AMPCharacter::DoSlideEnd);
