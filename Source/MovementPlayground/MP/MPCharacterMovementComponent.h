@@ -41,8 +41,22 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "deg"))
 	float WallRunMaxSurfaceTilt = 15.f;
 	
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run")
-	float WallRunGravityScale = 0.3f;
+	/** Fraction of upward speed kept when attaching (falling speed is always caught at 0) */
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float WallRunUpSpeedCarry = 0.5f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float WallRunMaxEntryUpSpeed = 250.f;
+
+	/** Gravity ramps from Start to End over WallRunMaxDuration, shaped by the exponent (higher = floatier, then a sharper drop) */
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.0"))
+	float WallRunGravityScaleStart = 0.3f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.0"))
+	float WallRunGravityScaleEnd = 1.5f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.1"))
+	float WallRunGravityCurveExponent = 2.f;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s"))
 	float WallRunStickSpeed = 200.f;
@@ -74,11 +88,12 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ForceUnits = "cm/s"))
 	float WallKickUpSpeed = 600.f;
 
-	/** After a kick, air braking is off and air control fades back in over this time */
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ForceUnits = "s", ClampMin = "0.0"))
-	float WallKickRecoveryTime = 0.3f;
+	/** Air control multiplier during a kick flight; input only acts along the kick direction (stretch or shorten, no steering). 0 = full lock */
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float WallKickAirControl = 1.f;
 
-	float WallKickTime = -1.f;
+	/** In the air after a wall kick: no air braking, scaled air control, facing the flight direction */
+	bool bIsWallKickFlight = false;
 	
 	TWeakObjectPtr<const UPrimitiveComponent> CurrentWall;
 	TWeakObjectPtr<const UPrimitiveComponent> LastWall;
@@ -140,7 +155,4 @@ protected:
 	bool FindRunnableWall(FHitResult& OutWallHit) const;
 	
 	bool FindKickableWall(FHitResult& OutKickHit) const;
-
-	/** 0 at the moment of a wall kick, rising to 1 over WallKickRecoveryTime; 1 when no kick is recovering */
-	float GetWallKickControlAlpha() const;
 };

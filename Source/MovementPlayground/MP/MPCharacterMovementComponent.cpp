@@ -283,6 +283,8 @@ void UMPCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iteration
 		
 		const FVector HVelocity(Velocity.X, Velocity.Y, 0.f);
 		const FVector AlongWall = FVector::VectorPlaneProject(HVelocity, WallRunNormal).GetSafeNormal();
+		const float RunAlpha = FMath::Clamp((GetWorld()->GetTimeSeconds() - WallRunStartTime) / WallRunMaxDuration, 0.f, 1.f);
+		const float WallRunGravityScale = FMath::Lerp(WallRunGravityScaleStart, WallRunGravityScaleEnd, FMath::Pow(RunAlpha, WallRunGravityCurveExponent));
 		const float NewVelocityZ = Velocity.Z + GetGravityZ() * WallRunGravityScale * TimeTick;
 		
 		Velocity = AlongWall * HVelocity.Size();
@@ -367,7 +369,7 @@ bool UMPCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime
 		MoveUpdatedComponent(FVector::ZeroVector, KickDirection.ToOrientationQuat(), false);
 
 		LastWall = KickHit.GetComponent();
-		WallKickTime = GetWorld()->GetTimeSeconds();
+		bIsWallKickFlight = true;
 		bLastJumpWasWallKick = true;
 
 		return true;
@@ -401,15 +403,16 @@ FRotator UMPCharacterMovementComponent::ComputeOrientToMovementRotation(const FR
 	if (IsWallRunning() && !Velocity.IsNearlyZero())
 		return Velocity.GetSafeNormal2D().Rotation();
 
-	if (IsFalling() && GetWallKickControlAlpha() < 1.f && Velocity.Size2D() > UE_KINDA_SMALL_NUMBER)
-		return Velocity.GetSafeNormal2D().Rotation();
+	// Like Super Mario 64, the facing set by the kick holds for the whole flight
+	if (bIsWallKickFlight && IsFalling())
+		return CurrentRotation;
 
 	return Super::ComputeOrientToMovementRotation(CurrentRotation, DeltaTime, DeltaRotation);
 }
 
 float UMPCharacterMovementComponent::GetMaxBrakingDeceleration() const
 {
-	if (IsFalling() && GetWallKickControlAlpha() < 1.f)
+	if (bIsWallKickFlight && IsFalling())
 		return 0.f;
 
 	return Super::GetMaxBrakingDeceleration();
@@ -417,17 +420,16 @@ float UMPCharacterMovementComponent::GetMaxBrakingDeceleration() const
 
 FVector UMPCharacterMovementComponent::GetAirControl(float DeltaTime, float TickAirControl, const FVector& FallAcceleration)
 {
-	return Super::GetAirControl(DeltaTime, TickAirControl * GetWallKickControlAlpha(), FallAcceleration);
-}
+	if (bIsWallKickFlight)
+	{
+		// Input can only stretch or shorten the kick along its own direction, not steer it
+		const FVector KickDirection = UpdatedComponent->GetForwardVector().GetSafeNormal2D();
+		const FVector AlongKick = KickDirection * FVector::DotProduct(FallAcceleration, KickDirection);
 
-float UMPCharacterMovementComponent::GetWallKickControlAlpha() const
-{
-	if (WallKickTime < 0.f || WallKickRecoveryTime <= 0.f || !GetWorld())
-		return 1.f;
+		return Super::GetAirControl(DeltaTime, TickAirControl * WallKickAirControl, AlongKick);
+	}
 
-	const float TimeSinceKick = GetWorld()->GetTimeSeconds() - WallKickTime;
-
-	return FMath::Clamp(TimeSinceKick / WallKickRecoveryTime, 0.f, 1.f);
+	return Super::GetAirControl(DeltaTime, TickAirControl, FallAcceleration);
 }
 
 FString UMPCharacterMovementComponent::MovementModeToString(EMovementMode Mode, uint8 CustomMode)
@@ -459,10 +461,13 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 	{
 		FVector HVelocity = Velocity;
 		HVelocity.Z = 0.f;
-			
+
+		const float OldVelocityZ = Velocity.Z;
+
 		const FVector AlongWall = FVector::VectorPlaneProject(HVelocity, WallRunNormal).GetSafeNormal();
 		Velocity = AlongWall * HVelocity.Size();
-			
+		Velocity.Z = FMath::Clamp(OldVelocityZ * WallRunUpSpeedCarry, 0.f, WallRunMaxEntryUpSpeed);
+
 		WallRunStartTime = GetWorld()->GetTimeSeconds();
 	}
 	
@@ -482,6 +487,9 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 	
 	if (MovementMode == MOVE_Walking)
 		LastWall.Reset();
+
+	if (MovementMode != MOVE_Falling)
+		bIsWallKickFlight = false;
 	
 	UE_LOG(LogMPMovement, Log, TEXT("From %s to %s"),
 		*MovementModeToString(PreviousMovementMode, PreviousCustomMode),
