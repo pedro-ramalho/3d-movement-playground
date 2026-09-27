@@ -33,6 +33,9 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
 	TObjectPtr<UAnimMontage> SlideMontage;
 	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
+	TObjectPtr<UAnimMontage> WallKickMontage;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide")
 	float SlideSpeedMultiplier = 1.2f;
 	
@@ -86,6 +89,7 @@ protected:
 	void Look(const FInputActionValue& Value);
 
 	virtual bool CanJumpInternal_Implementation() const override;
+	
 public:
 	// Sets default values for this character's properties
 	AMPCharacter(const FObjectInitializer& ObjectInitializer);
@@ -118,4 +122,6 @@ public:
 	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+	
+	virtual void OnJumped_Implementation() override;
 };

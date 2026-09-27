@@ -134,6 +134,11 @@ void AMPCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 P
 
 		PlayAnimMontage(SlideMontage);
 	}
+	
+	if (WallKickMontage && (GetMPMovement()->MovementMode == MOVE_Walking || GetMPMovement()->IsWallRunning()))
+	{
+		StopAnimMontage(WallKickMontage);
+	}
 
 	if (PrevMovementMode == MOVE_Custom && static_cast<EMPCustomMovementMode>(PreviousCustomMode) == EMPCustomMovementMode::Slide)
 	{
@@ -225,4 +230,12 @@ bool AMPCharacter::CanJumpInternal_Implementation() const
 		return true;
 	
 	return Super::CanJumpInternal_Implementation();
+}
+
+void AMPCharacter::OnJumped_Implementation()
+{
+	Super::OnJumped_Implementation();
+	
+	if (GetMPMovement()->LastJumpWasWallKick() && WallKickMontage)
+		PlayAnimMontage(WallKickMontage);
 }

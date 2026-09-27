@@ -24,6 +24,8 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 
 	bool bHasKickCandidate = false;
 	
+	bool bLastJumpWasWallKick = false;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s"))
 	float SlideEnterSpeed = 350.0f;
 	
@@ -123,6 +125,8 @@ public:
 	bool CanStandUp() const;
 	
 	bool CanWallKick() const;
+	
+	bool LastJumpWasWallKick() const { return bLastJumpWasWallKick; }
 
 protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;

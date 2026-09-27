@@ -341,6 +341,8 @@ bool UMPCharacterMovementComponent::IsCustomMovementMode(EMPCustomMovementMode M
 
 bool UMPCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime)
 {
+	bLastJumpWasWallKick = false;
+
 	if (IsCustomMovementMode(EMPCustomMovementMode::WallRun) && CharacterOwner && CharacterOwner->CanJump())
 	{
 		const FVector AlongWall(Velocity.X, Velocity.Y, 0.f);
@@ -366,7 +368,8 @@ bool UMPCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime
 
 		LastWall = KickHit.GetComponent();
 		WallKickTime = GetWorld()->GetTimeSeconds();
-		
+		bLastJumpWasWallKick = true;
+
 		return true;
 	}
 	
