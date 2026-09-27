@@ -221,5 +221,8 @@ bool AMPCharacter::CanJumpInternal_Implementation() const
 	if (GetMPMovement()->IsCustomMovementMode(EMPCustomMovementMode::Slide))
 		return JumpIsAllowedInternal();
 	
+	if (GetMPMovement()->CanWallKick())
+		return true;
+	
 	return Super::CanJumpInternal_Implementation();
 }

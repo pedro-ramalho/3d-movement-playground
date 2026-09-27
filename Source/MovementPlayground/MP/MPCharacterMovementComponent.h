@@ -66,6 +66,18 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ForceUnits = "deg"))
 	float WallKickMaxAngle = 45.f;
 	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ForceUnits = "cm/s"))
+	float WallKickOutSpeed = 800.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ForceUnits = "cm/s"))
+	float WallKickUpSpeed = 600.f;
+
+	/** After a kick, air braking is off and air control fades back in over this time */
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ForceUnits = "s", ClampMin = "0.0"))
+	float WallKickRecoveryTime = 0.3f;
+
+	float WallKickTime = -1.f;
+	
 	TWeakObjectPtr<const UPrimitiveComponent> CurrentWall;
 	TWeakObjectPtr<const UPrimitiveComponent> LastWall;
 	
@@ -98,13 +110,19 @@ public:
 	float GetWallRunSide() const;
 	
 	virtual FRotator ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const override;
-	
+
+	virtual float GetMaxBrakingDeceleration() const override;
+
+	virtual FVector GetAirControl(float DeltaTime, float TickAirControl, const FVector& FallAcceleration) override;
+
 	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);
 	
 	void SetWantsToSlide(bool bWants);
 
 	/** Would a standing capsule fit here, keeping the feet where they are? */
 	bool CanStandUp() const;
+	
+	bool CanWallKick() const;
 
 protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
@@ -118,4 +136,7 @@ protected:
 	bool FindRunnableWall(FHitResult& OutWallHit) const;
 	
 	bool FindKickableWall(FHitResult& OutKickHit) const;
+
+	/** 0 at the moment of a wall kick, rising to 1 over WallKickRecoveryTime; 1 when no kick is recovering */
+	float GetWallKickControlAlpha() const;
 };

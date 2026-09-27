@@ -351,6 +351,25 @@ bool UMPCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime
 		return true;
 	}
 	
+	FHitResult KickHit;
+	if (FindKickableWall(KickHit))
+	{
+		const FVector WallNormal = KickHit.ImpactNormal.GetSafeNormal2D();
+		const FVector HVelocity(Velocity.X, Velocity.Y, 0.f);
+		const FVector AlongWall = FVector::VectorPlaneProject(HVelocity, WallNormal);
+		
+		Velocity = AlongWall + WallNormal * WallKickOutSpeed + FVector::UpVector * WallKickUpSpeed;
+
+		// Face where the kick sends us: the approach direction mirrored off the wall, like Super Mario 64
+		const FVector KickDirection = FVector(Velocity.X, Velocity.Y, 0.f).GetSafeNormal();
+		MoveUpdatedComponent(FVector::ZeroVector, KickDirection.ToOrientationQuat(), false);
+
+		LastWall = KickHit.GetComponent();
+		WallKickTime = GetWorld()->GetTimeSeconds();
+		
+		return true;
+	}
+	
 	return Super::DoJump(bReplayingMoves, DeltaTime);
 }
 
@@ -378,8 +397,34 @@ FRotator UMPCharacterMovementComponent::ComputeOrientToMovementRotation(const FR
 {
 	if (IsWallRunning() && !Velocity.IsNearlyZero())
 		return Velocity.GetSafeNormal2D().Rotation();
-	
+
+	if (IsFalling() && GetWallKickControlAlpha() < 1.f && Velocity.Size2D() > UE_KINDA_SMALL_NUMBER)
+		return Velocity.GetSafeNormal2D().Rotation();
+
 	return Super::ComputeOrientToMovementRotation(CurrentRotation, DeltaTime, DeltaRotation);
+}
+
+float UMPCharacterMovementComponent::GetMaxBrakingDeceleration() const
+{
+	if (IsFalling() && GetWallKickControlAlpha() < 1.f)
+		return 0.f;
+
+	return Super::GetMaxBrakingDeceleration();
+}
+
+FVector UMPCharacterMovementComponent::GetAirControl(float DeltaTime, float TickAirControl, const FVector& FallAcceleration)
+{
+	return Super::GetAirControl(DeltaTime, TickAirControl * GetWallKickControlAlpha(), FallAcceleration);
+}
+
+float UMPCharacterMovementComponent::GetWallKickControlAlpha() const
+{
+	if (WallKickTime < 0.f || WallKickRecoveryTime <= 0.f || !GetWorld())
+		return 1.f;
+
+	const float TimeSinceKick = GetWorld()->GetTimeSeconds() - WallKickTime;
+
+	return FMath::Clamp(TimeSinceKick / WallKickRecoveryTime, 0.f, 1.f);
 }
 
 FString UMPCharacterMovementComponent::MovementModeToString(EMovementMode Mode, uint8 CustomMode)
@@ -571,4 +616,11 @@ bool UMPCharacterMovementComponent::FindKickableWall(FHitResult& OutKickHit) con
 	}
 	
 	return bKickable;
+}
+
+bool UMPCharacterMovementComponent::CanWallKick() const
+{
+	FHitResult Hit;
+	
+	return FindKickableWall(Hit);
 }
