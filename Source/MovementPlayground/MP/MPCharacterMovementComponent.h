@@ -21,6 +21,8 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	bool bWantsToSlide;
 	
 	bool bHasWallCandidate = false;
+
+	bool bHasKickCandidate = false;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s"))
 	float SlideEnterSpeed = 350.0f;
@@ -54,6 +56,15 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s"))
 	float WallJumpUpSpeed = 500.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ForceUnits = "cm"))
+	float WallKickTraceDistance = 20.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ForceUnits = "cm"))
+	float WallKickTraceRadius = 20.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ForceUnits = "deg"))
+	float WallKickMaxAngle = 45.f;
 	
 	TWeakObjectPtr<const UPrimitiveComponent> CurrentWall;
 	TWeakObjectPtr<const UPrimitiveComponent> LastWall;
@@ -105,4 +116,6 @@ protected:
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	
 	bool FindRunnableWall(FHitResult& OutWallHit) const;
+	
+	bool FindKickableWall(FHitResult& OutKickHit) const;
 };

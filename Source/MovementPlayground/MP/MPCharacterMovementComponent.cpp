@@ -61,8 +61,10 @@ void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float Del
 		CurrentWall = WallHit.GetComponent();
 		SetMovementMode(MOVE_Custom, static_cast<uint8>(EMPCustomMovementMode::WallRun));
 	}
-	
-	
+
+	FHitResult KickHit;
+	bHasKickCandidate = MovementMode == MOVE_Falling && FindKickableWall(KickHit);
+
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
 }
 
@@ -124,6 +126,7 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 	constexpr int32 SlideKey = 3;
 	constexpr int32 CrouchKey = 4;
 	constexpr int32 WallRunKey = 5;
+	constexpr int32 WallKickKey = 6;
 
 	GEngine->AddOnScreenDebugMessage(
 		ModeKey,
@@ -159,7 +162,14 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 		FColor::Cyan,
 		FString::Printf(TEXT("Wall candidate: %s"), bHasWallCandidate ? TEXT("yes") : TEXT("no"))
 	);
-	
+
+	GEngine->AddOnScreenDebugMessage(
+		WallKickKey,
+		0.f,
+		FColor::Cyan,
+		FString::Printf(TEXT("Wall kick: %s"), bHasKickCandidate ? TEXT("yes") : TEXT("no"))
+	);
+
 #endif
 }
 
@@ -508,4 +518,57 @@ bool UMPCharacterMovementComponent::FindRunnableWall(FHitResult& OutWallHit) con
 	}
 
 	return bRunnable;
+}
+
+bool UMPCharacterMovementComponent::FindKickableWall(FHitResult& OutKickHit) const
+{
+	if (!HasValidData() || MovementMode != MOVE_Falling)
+		return false;
+	
+	const FVector Forward = CharacterOwner->GetActorForwardVector().GetSafeNormal2D();
+	
+	if (Forward.IsNearlyZero())
+		return false;
+	
+	const float CapsuleRadius = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius();
+	const float TraceLength = CapsuleRadius + WallKickTraceDistance;
+	
+	FCollisionQueryParams CollisionParams(SCENE_QUERY_STAT(FindKickableWall), false, CharacterOwner);
+	
+	const FVector Start = UpdatedComponent->GetComponentLocation();
+	const FVector End = Start + Forward * TraceLength;
+	
+	FHitResult KickHit;
+	const bool bHit = GetWorld()->SweepSingleByChannel(KickHit, Start, End, FQuat::Identity, ECC_WallRun,
+		FCollisionShape::MakeSphere(WallKickTraceRadius), CollisionParams);
+	
+	bool bKickable = bHit && KickHit.GetComponent() != LastWall.Get();
+	
+	if (bKickable)
+	{
+		const float MaxNormalZ = FMath::Sin(FMath::DegreesToRadians(WallRunMaxSurfaceTilt));
+		const float FacingDot = FVector::DotProduct(Forward, -KickHit.ImpactNormal.GetSafeNormal2D());
+		const float MinFacingDot = FMath::Cos(FMath::DegreesToRadians(WallKickMaxAngle));
+		
+		bKickable = FMath::Abs(KickHit.ImpactNormal.Z) <= MaxNormalZ
+			&& FacingDot >= MinFacingDot;
+	}
+	
+#if !UE_BUILD_SHIPPING
+	if (CVarMPDebugMovement.GetValueOnGameThread() != 0)
+	{
+		const FColor Color = !bHit ? FColor::Silver : (bKickable ? FColor::Green : FColor::Red);
+		const FVector SphereCenter = bHit ? KickHit.Location : End;
+		
+		DrawDebugLine(GetWorld(), Start, SphereCenter, Color, false, -1.f, 0, 1.5f);
+		DrawDebugSphere(GetWorld(), SphereCenter, WallKickTraceRadius, 12, Color, false, -1.f, 0, 1.f);
+	}
+#endif
+	
+	if (bKickable)
+	{
+		OutKickHit = KickHit;
+	}
+	
+	return bKickable;
 }
