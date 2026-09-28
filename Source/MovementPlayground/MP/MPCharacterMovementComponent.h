@@ -169,6 +169,9 @@ public:
 	bool IsGrappling() const;
 	
 	UFUNCTION(BlueprintPure, Category = "MP|Movement")
+	float GetGrappleSwingAngle() const;
+	
+	UFUNCTION(BlueprintPure, Category = "MP|Movement")
 	FVector GetGrappleAnchor() const { return GrappleAnchor; }
 	
 	const AActor* GetGrappleAnchorActor() const { return GrappleAnchorActor.Get(); }

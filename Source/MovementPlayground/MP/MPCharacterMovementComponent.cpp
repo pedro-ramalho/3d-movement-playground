@@ -785,3 +785,14 @@ void UMPCharacterMovementComponent::ApplyRopeToPosition()
 	
 	ApplyRopeToVelocity();
 }
+
+float UMPCharacterMovementComponent::GetGrappleSwingAngle() const
+{
+	if (!IsGrappling() || !CharacterOwner)
+		return 0.f;
+	
+	const FVector Rope = GrappleAnchor - UpdatedComponent->GetComponentLocation();
+	const FVector Forward = CharacterOwner->GetActorForwardVector().GetSafeNormal2D();
+	
+	return FMath::RadiansToDegrees(FMath::Atan2(-FVector::DotProduct(Rope, Forward), Rope.Z));
+}

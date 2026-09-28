@@ -179,7 +179,7 @@ void AMPCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 P
 		PlayAnimMontage(SlideMontage);
 	}
 	
-	if (WallKickMontage && (GetMPMovement()->MovementMode == MOVE_Walking || GetMPMovement()->IsWallRunning()))
+	if (WallKickMontage && (GetMPMovement()->MovementMode == MOVE_Walking || GetMPMovement()->IsWallRunning() || GetMPMovement()->IsGrappling()))
 	{
 		StopAnimMontage(WallKickMontage);
 	}
