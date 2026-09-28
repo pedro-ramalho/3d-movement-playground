@@ -17,3 +17,4 @@ enum class EMPCustomMovementMode : uint8
 };
 
 constexpr ECollisionChannel ECC_WallRun = ECC_GameTraceChannel1;
+constexpr ECollisionChannel ECC_Grapple = ECC_GameTraceChannel2;
