@@ -14,6 +14,7 @@
 #include "Engine/OverlapResult.h"
 #include "Engine/Engine.h"
 #include "DrawDebugHelpers.h"
+#include "CableComponent.h"
 #include "MP/MPMovementTypes.h"
 #include "MP/MPCharacterMovementComponent.h"
 #include "MP/MPGrapplePoint.h"
@@ -35,6 +36,7 @@ AMPCharacter::AMPCharacter(const FObjectInitializer& ObjectInitializer) : Super(
 	
 	SetupCameraBoom();
 	SetupFollowCamera();
+	SetupGrappleCable();
 }
 
 void AMPCharacter::BeginPlay()
@@ -183,6 +185,21 @@ void AMPCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 P
 	{
 		StopAnimMontage(WallKickMontage);
 	}
+	
+	if (GrappleCable && GetMPMovement()->IsGrappling())
+	{
+		if (const AActor* AnchorActor = GetMPMovement()->GetGrappleAnchorActor())
+		{
+			GrappleCable->SetAttachEndToComponent(AnchorActor->GetRootComponent());
+			GrappleCable->EndLocation = FVector::ZeroVector;
+			GrappleCable->SetVisibility(true);
+		}
+	}
+
+	if (GrappleCable && PrevMovementMode == MOVE_Custom && static_cast<EMPCustomMovementMode>(PreviousCustomMode) == EMPCustomMovementMode::Grapple)
+	{
+		GrappleCable->SetVisibility(false);
+	}
 
 	if (PrevMovementMode == MOVE_Custom && static_cast<EMPCustomMovementMode>(PreviousCustomMode) == EMPCustomMovementMode::Slide)
 	{
@@ -293,6 +310,21 @@ void AMPCharacter::OnJumped_Implementation()
 	
 	if (GetMPMovement()->LastJumpWasWallKick() && WallKickMontage)
 		PlayAnimMontage(WallKickMontage);
+}
+
+void AMPCharacter::SetupGrappleCable()
+{
+	GrappleCable = CreateDefaultSubobject<UCableComponent>(TEXT("GrappleCable"));
+	GrappleCable->SetupAttachment(GetMesh(), TEXT("hand_r"));
+
+	GrappleCable->CableLength = 0.f;
+	GrappleCable->NumSegments = 8;
+	GrappleCable->SolverIterations = 4;
+	GrappleCable->bEnableStiffness = true;
+	GrappleCable->CableWidth = 3.f;
+	GrappleCable->bAttachEnd = true;
+
+	GrappleCable->SetVisibility(false);
 }
 
 AMPGrapplePoint* AMPCharacter::FindBestGrapplePoint() const

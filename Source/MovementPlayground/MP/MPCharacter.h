@@ -12,6 +12,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 class UAnimMontage;
+class UCableComponent;
 class AMPGrapplePoint;
 
 struct FInputActionValue;
@@ -36,6 +37,9 @@ private:
 	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
 	TObjectPtr<UAnimMontage> WallKickMontage;
+	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCableComponent> GrappleCable;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide")
 	float SlideSpeedMultiplier = 1.2f;
@@ -62,6 +66,8 @@ private:
 	void SetupCameraBoom();
 	
 	void SetupFollowCamera();
+	
+	void SetupGrappleCable();
 
 	/** Name of the Montage Notify in the slide montage where the get-up begins */
 	static const FName SlideGetUpNotifyName;

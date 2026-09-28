@@ -12,6 +12,7 @@ public class MovementPlayground : ModuleRules
 			"Core",
 			"CoreUObject",
 			"Engine",
+			"CableComponent",
 			"InputCore",
 			"EnhancedInput",
 			"AIModule",
