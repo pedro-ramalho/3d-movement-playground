@@ -199,7 +199,15 @@ protected:
 	
 	void PhysWallRun(float deltaTime, int32 Iterations);
 	
+	// Grapple Mechanic
 	void PhysGrapple(float deltaTime, int32 Iterations);
+
+	void TryEnterGrapple();
+	
+	void OnEnterGrapple();
+
+	void OnExitGrapple();
+
 	
 	bool ShouldReleaseGrapple() const;
 	
