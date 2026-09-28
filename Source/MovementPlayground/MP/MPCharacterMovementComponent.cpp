@@ -345,12 +345,38 @@ void UMPCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iteration
 
 void UMPCharacterMovementComponent::PhysGrapple(float deltaTime, int32 Iterations)
 {
-	if (ShouldReleaseGrapple())
+	float RemainingTime = deltaTime;
+	
+	while (RemainingTime >= MIN_TICK_TIME && Iterations < MaxSimulationIterations)
 	{
-		SetMovementMode(MOVE_Falling);
-		StartNewPhysics(deltaTime, Iterations);
+		Iterations++;
+		const float TimeTick = GetSimulationTimeStep(RemainingTime, Iterations);
 		
-		return;
+		if (ShouldReleaseGrapple())
+		{
+			SetMovementMode(MOVE_Falling);
+			StartNewPhysics(RemainingTime, Iterations);
+		
+			return;
+		}
+		
+		RemainingTime -= TimeTick;
+		
+		Velocity.Z += GetGravityZ() * GrappleGravityScale * TimeTick;
+		
+		ApplyRopeToVelocity();
+		
+		const FVector Delta = Velocity * TimeTick;
+		
+		FHitResult Hit;
+		SafeMoveUpdatedComponent(Delta, UpdatedComponent->GetComponentQuat(), true, Hit);
+		if (Hit.IsValidBlockingHit())
+		{
+			HandleImpact(Hit, TimeTick, Delta);
+			SlideAlongSurface(Delta, 1.f - Hit.Time, Hit.Normal, Hit, true);
+		}
+		
+		ApplyRopeToPosition();
 	}
 }
 
@@ -449,6 +475,18 @@ FRotator UMPCharacterMovementComponent::ComputeOrientToMovementRotation(const FR
 	if (bIsWallKickFlight && IsFalling())
 		return CurrentRotation;
 
+	if (IsGrappling())
+	{
+		const FVector SwingDirection = Velocity.GetSafeNormal2D();
+		if (SwingDirection.IsNearlyZero())
+			return CurrentRotation;
+		
+		const FVector CurrentForward = CurrentRotation.Vector().GetSafeNormal2D();
+		const FVector Facing = FVector::DotProduct(SwingDirection, CurrentForward) >= 0.f ? SwingDirection : -SwingDirection;
+		
+		return Facing.Rotation();
+	}
+	
 	return Super::ComputeOrientToMovementRotation(CurrentRotation, DeltaTime, DeltaRotation);
 }
 
@@ -711,7 +749,39 @@ bool UMPCharacterMovementComponent::ShouldReleaseGrapple() const
 {
 	const bool bReleased = !bWantsToGrapple;
 	const bool bAnchorGone = !GrappleAnchorActor.IsValid();
-	const bool bTimedOut = GetWorld()->GetTimeSeconds() - GrappleStartTime >= GrappleMaxDuration;
+
+	return bReleased || bAnchorGone;
+}
+
+void UMPCharacterMovementComponent::ApplyRopeToVelocity()
+{
+	const FVector ToCharacter = UpdatedComponent->GetComponentLocation() - GrappleAnchor;
+	const float Distance = ToCharacter.Size();
 	
-	return bReleased || bAnchorGone || bTimedOut;
+	if (Distance < RopeLength - 1.f || Distance < UE_KINDA_SMALL_NUMBER)
+		return;
+	
+	const FVector Outward = ToCharacter / Distance;
+	const float OutwardSpeed = FVector::DotProduct(Velocity, Outward);
+	
+	if (OutwardSpeed > 0.f)
+		Velocity -= Outward * OutwardSpeed;
+}
+
+void UMPCharacterMovementComponent::ApplyRopeToPosition()
+{
+	const FVector Location = UpdatedComponent->GetComponentLocation();
+	const FVector ToCharacter = Location - GrappleAnchor;
+	
+	const float Distance = ToCharacter.Size();
+	
+	if (Distance <= RopeLength || Distance < UE_KINDA_SMALL_NUMBER)
+		return;
+	
+	const FVector Target = GrappleAnchor + ToCharacter / Distance * RopeLength;
+	
+	FHitResult Hit;
+	SafeMoveUpdatedComponent(Target - Location, UpdatedComponent->GetComponentQuat(), true, Hit);
+	
+	ApplyRopeToVelocity();
 }

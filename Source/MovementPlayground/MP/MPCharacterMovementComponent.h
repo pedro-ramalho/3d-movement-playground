@@ -95,10 +95,10 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	float WallKickAirControl = 1.f;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "s", ClampMin = "0.0"))
-	float GrappleMaxDuration = 6.f;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "s", ClampMin = "0.0"))
 	float GrappleCooldown = 0.3f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ClampMin = "0.0"))
+	float GrappleGravityScale = 1.f;
 
 	/** In the air after a wall kick: no air braking, scaled air control, facing the flight direction */
 	bool bIsWallKickFlight = false;
@@ -189,4 +189,8 @@ protected:
 	bool FindRunnableWall(FHitResult& OutWallHit) const;
 	
 	bool FindKickableWall(FHitResult& OutKickHit) const;
+	
+	void ApplyRopeToVelocity();
+	
+	void ApplyRopeToPosition();
 };
