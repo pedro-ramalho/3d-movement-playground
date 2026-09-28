@@ -11,15 +11,19 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
 #include "Animation/AnimMontage.h"
+#include "Engine/OverlapResult.h"
+#include "Engine/Engine.h"
+#include "DrawDebugHelpers.h"
 #include "MP/MPMovementTypes.h"
 #include "MP/MPCharacterMovementComponent.h"
+#include "MP/MPGrapplePoint.h"
 
 const FName AMPCharacter::SlideGetUpNotifyName(TEXT("GetUp"));
 
 AMPCharacter::AMPCharacter(const FObjectInitializer& ObjectInitializer) : Super(
 	ObjectInitializer.SetDefaultSubobjectClass<UMPCharacterMovementComponent>(CharacterMovementComponentName))
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 	
 	MPMovement = CastChecked<UMPCharacterMovementComponent>(GetCharacterMovement());
 	
@@ -65,6 +69,43 @@ void AMPCharacter::BeginPlay()
 	}
 }
 
+void AMPCharacter::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+	
+	AMPGrapplePoint* NewTarget = FindBestGrapplePoint();
+	AMPGrapplePoint* OldTarget = GrappleTarget.Get();
+
+	if (NewTarget != OldTarget)
+	{
+		if (OldTarget)
+		{
+			OldTarget->SetHighlighted(false);
+		}
+
+		if (NewTarget)
+		{
+			NewTarget->SetHighlighted(true);
+		}
+
+		GrappleTarget = NewTarget;
+	}
+
+#if !UE_BUILD_SHIPPING
+	if (UMPCharacterMovementComponent::IsDebugEnabled() && GEngine)
+	{
+		constexpr int32 GrappleTargetKey = 7;
+
+		GEngine->AddOnScreenDebugMessage(
+			GrappleTargetKey,
+			0.f,
+			FColor::Cyan,
+			FString::Printf(TEXT("Grapple target: %s"), NewTarget ? *NewTarget->GetName() : TEXT("none"))
+		);
+	}
+#endif
+}
+
 void AMPCharacter::OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload)
 {
 	if (NotifyName != SlideGetUpNotifyName || !GetMPMovement()->IsSliding())
@@ -106,6 +147,9 @@ void AMPCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 		
 		EnhancedInputComponent->BindAction(SlideAction, ETriggerEvent::Started, this, &AMPCharacter::DoSlideStart);
 		EnhancedInputComponent->BindAction(SlideAction, ETriggerEvent::Completed, this, &AMPCharacter::DoSlideEnd);
+		
+		EnhancedInputComponent->BindAction(GrappleAction, ETriggerEvent::Started, this, &AMPCharacter::DoGrappleStart);
+		EnhancedInputComponent->BindAction(GrappleAction, ETriggerEvent::Completed, this, &AMPCharacter::DoGrappleEnd);
 		
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AMPCharacter::Move);
 		EnhancedInputComponent->BindAction(MouseLookAction, ETriggerEvent::Triggered, this, &AMPCharacter::Look);
@@ -221,6 +265,16 @@ void AMPCharacter::DoSlideEnd()
 	GetMPMovement()->SetWantsToSlide(false);
 }
 
+void AMPCharacter::DoGrappleStart()
+{
+	UE_LOG(LogMPMovement, Log, TEXT("Grapple pressed"));
+}
+
+void AMPCharacter::DoGrappleEnd()
+{
+	UE_LOG(LogMPMovement, Log, TEXT("Grapple released"));
+}
+
 bool AMPCharacter::CanJumpInternal_Implementation() const
 {
 	if (GetMPMovement()->IsCustomMovementMode(EMPCustomMovementMode::Slide))
@@ -238,4 +292,95 @@ void AMPCharacter::OnJumped_Implementation()
 	
 	if (GetMPMovement()->LastJumpWasWallKick() && WallKickMontage)
 		PlayAnimMontage(WallKickMontage);
+}
+
+AMPGrapplePoint* AMPCharacter::FindBestGrapplePoint() const
+{
+	TArray<FOverlapResult> Candidates;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(FindBestGrapplePoint), false, this);
+	
+	GetWorld()->OverlapMultiByChannel(Candidates, GetActorLocation(), FQuat::Identity, ECC_Grapple,
+		FCollisionShape::MakeSphere(GrappleMaxRange), Params);
+	
+	const float MinAimDot = FMath::Cos(FMath::DegreesToRadians(GrappleAimAngle));
+	
+	const FVector CameraLocation = FollowCamera->GetComponentLocation();
+	const FVector CameraForward = FollowCamera->GetForwardVector();
+	
+	const FVector CharacterCenter = GetActorLocation();
+	
+	AMPGrapplePoint* BestPoint = nullptr;
+	float BestDot = -1.f;
+
+	FCollisionQueryParams LineParams(SCENE_QUERY_STAT(GrappleLineOfSight), false, this);
+
+	const bool bDebug = UMPCharacterMovementComponent::IsDebugEnabled();
+	TArray<TPair<FVector, FColor>, TInlineAllocator<16>> DebugLines;
+
+	for (const FOverlapResult& Candidate : Candidates)
+	{
+		AMPGrapplePoint* GrapplePoint = Cast<AMPGrapplePoint>(Candidate.GetActor());
+		if (!GrapplePoint)
+			continue;
+
+		const FVector AnchorLocation = GrapplePoint->GetAnchorLocation();
+
+		const FVector ToPoint = (AnchorLocation - CameraLocation).GetSafeNormal();
+		const float AimDot = FVector::DotProduct(CameraForward, ToPoint);
+
+		if (AimDot < MinAimDot)
+		{
+			if (bDebug)
+			{
+				DebugLines.Emplace(AnchorLocation, FColor::Silver);
+			}
+
+			continue;
+		}
+
+		const bool bTooLow = AnchorLocation.Z < CharacterCenter.Z + GrappleMinHeightAbove;
+
+		FHitResult BlockingHit;
+		const bool bBlocked = !bTooLow && GetWorld()->LineTraceSingleByChannel(
+			BlockingHit, CharacterCenter, AnchorLocation, ECC_Visibility, LineParams
+		);
+
+		if (bTooLow || bBlocked)
+		{
+			if (bDebug)
+			{
+				DebugLines.Emplace(AnchorLocation, FColor::Red);
+			}
+
+			continue;
+		}
+
+		if (bDebug)
+		{
+			DebugLines.Emplace(AnchorLocation, FColor::Yellow);
+		}
+
+		if (AimDot > BestDot)
+		{
+			BestDot = AimDot;
+			BestPoint = GrapplePoint;
+		}
+	}
+
+#if !UE_BUILD_SHIPPING
+	if (bDebug)
+	{
+		for (const TPair<FVector, FColor>& Line : DebugLines)
+		{
+			DrawDebugLine(GetWorld(), CharacterCenter, Line.Key, Line.Value, false, -1.f, 0, 1.5f);
+		}
+
+		if (BestPoint)
+		{
+			DrawDebugLine(GetWorld(), CharacterCenter, BestPoint->GetAnchorLocation(), FColor::Green, false, -1.f, 0, 2.5f);
+		}
+	}
+#endif
+
+	return BestPoint;
 }

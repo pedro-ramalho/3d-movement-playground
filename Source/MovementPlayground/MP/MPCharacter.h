@@ -12,6 +12,7 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
 class UAnimMontage;
+class AMPGrapplePoint;
 
 struct FInputActionValue;
 
@@ -47,6 +48,15 @@ private:
 
 	/** Measured from SlideMontage in BeginPlay, not tuned */
 	float SlideMontagePeakSpeed = 0.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm"))
+	float GrappleMaxRange = 2500.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "deg"))
+	float GrappleAimAngle = 20.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm"))
+	float GrappleMinHeightAbove = 100.f;
 
 	/** Camera Boom and Follow Camera Setup */
 	void SetupCameraBoom();
@@ -59,7 +69,11 @@ private:
 	/** Receives the Montage Notifies of every montage this character plays */
 	UFUNCTION()
 	void OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload);
-
+	
+	AMPGrapplePoint* FindBestGrapplePoint() const;
+	
+	TWeakObjectPtr<AMPGrapplePoint> GrappleTarget;
+	
 protected:
 	virtual void BeginPlay() override;
 
@@ -69,6 +83,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> SlideAction;
+	
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> GrappleAction;
 	
 	/** Move Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
@@ -89,6 +106,7 @@ protected:
 	void Look(const FInputActionValue& Value);
 
 	virtual bool CanJumpInternal_Implementation() const override;
+	
 	
 public:
 	// Sets default values for this character's properties
@@ -117,6 +135,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoSlideEnd();
 	
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoGrappleStart();
+	
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoGrappleEnd();
+	
 	FORCEINLINE UMPCharacterMovementComponent* GetMPMovement() const { return MPMovement; }
 	
 	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
@@ -124,4 +148,6 @@ public:
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
 	
 	virtual void OnJumped_Implementation() override;
+	
+	virtual void Tick(float DeltaSeconds) override;
 };

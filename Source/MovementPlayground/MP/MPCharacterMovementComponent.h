@@ -133,6 +133,8 @@ public:
 	virtual FVector GetAirControl(float DeltaTime, float TickAirControl, const FVector& FallAcceleration) override;
 
 	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);
+
+	static bool IsDebugEnabled();
 	
 	void SetWantsToSlide(bool bWants);
 

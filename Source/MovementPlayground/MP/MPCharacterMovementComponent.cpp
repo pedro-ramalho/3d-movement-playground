@@ -2,6 +2,7 @@
 
 #include "MP/MPCharacterMovementComponent.h"
 #include "MP/MPMovementTypes.h"
+
 #include "GameFramework/Character.h"
 #include "Components/CapsuleComponent.h"
 #include "DrawDebugHelpers.h"
@@ -14,6 +15,15 @@ static TAutoConsoleVariable<int32> CVarMPDebugMovement(
 	TEXT("Show MP movement debug overlay, 0: off, 1: on"),
 	ECVF_Cheat
 );
+
+bool UMPCharacterMovementComponent::IsDebugEnabled()
+{
+#if !UE_BUILD_SHIPPING
+	return CVarMPDebugMovement.GetValueOnGameThread() != 0;
+#else
+	return false;
+#endif
+}
 
 UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 {
@@ -635,3 +645,4 @@ bool UMPCharacterMovementComponent::CanWallKick() const
 	
 	return FindKickableWall(Hit);
 }
+
