@@ -26,6 +26,8 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	
 	bool bLastJumpWasWallKick = false;
 	
+	bool bWantsToGrapple = false;
+	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s"))
 	float SlideEnterSpeed = 350.0f;
 	
@@ -91,16 +93,29 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	/** Air control multiplier during a kick flight; input only acts along the kick direction (stretch or shorten, no steering). 0 = full lock */
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float WallKickAirControl = 1.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "s", ClampMin = "0.0"))
+	float GrappleMaxDuration = 6.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "s", ClampMin = "0.0"))
+	float GrappleCooldown = 0.3f;
 
 	/** In the air after a wall kick: no air braking, scaled air control, facing the flight direction */
 	bool bIsWallKickFlight = false;
 	
 	TWeakObjectPtr<const UPrimitiveComponent> CurrentWall;
 	TWeakObjectPtr<const UPrimitiveComponent> LastWall;
+	TWeakObjectPtr<const AActor> GrappleAnchorActor;
 	
 	FVector WallRunNormal = FVector::ZeroVector;
+	FVector GrappleAnchor = FVector::ZeroVector;
 	
 	float WallRunStartTime = 0.f;
+	
+	float RopeLength = 0.f;
+	
+	float GrappleStartTime = 0.f;
+	float GrappleEndTime = -1000.f;
 	
 public:
 	UMPCharacterMovementComponent();
@@ -145,12 +160,29 @@ public:
 	
 	bool LastJumpWasWallKick() const { return bLastJumpWasWallKick; }
 
+	// Grappling API
+	void RequestGrapple(const FVector& Anchor, const AActor* AnchorActor);
+	
+	void ReleaseGrapple();
+	
+	UFUNCTION(BlueprintPure, Category = "MP|Movement")
+	bool IsGrappling() const;
+	
+	UFUNCTION(BlueprintPure, Category = "MP|Movement")
+	FVector GetGrappleAnchor() const { return GrappleAnchor; }
+	
+	const AActor* GetGrappleAnchorActor() const { return GrappleAnchorActor.Get(); }
+	
 protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
 	
 	void PhysSlide(float deltaTime, int32 Iterations);
 	
 	void PhysWallRun(float deltaTime, int32 Iterations);
+	
+	void PhysGrapple(float deltaTime, int32 Iterations);
+	
+	bool ShouldReleaseGrapple() const;
 	
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	

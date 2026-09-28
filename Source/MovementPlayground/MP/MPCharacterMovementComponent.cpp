@@ -49,6 +49,10 @@ UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 
 void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
 {
+	const bool bCooldownReady = GetWorld()->GetTimeSeconds() - GrappleEndTime >= GrappleCooldown;
+	if (bWantsToGrapple && !IsGrappling() && bCooldownReady && GrappleAnchorActor.IsValid())
+		SetMovementMode(MOVE_Custom, static_cast<uint8>(EMPCustomMovementMode::Grapple));
+	
 	// Are we in walking mode?
 	if (MovementMode == MOVE_Walking)
 	{
@@ -137,6 +141,7 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 	constexpr int32 CrouchKey = 4;
 	constexpr int32 WallRunKey = 5;
 	constexpr int32 WallKickKey = 6;
+	constexpr int32 GrappleKey = 8;
 
 	GEngine->AddOnScreenDebugMessage(
 		ModeKey,
@@ -179,6 +184,18 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 		FColor::Cyan,
 		FString::Printf(TEXT("Wall kick: %s"), bHasKickCandidate ? TEXT("yes") : TEXT("no"))
 	);
+	
+	GEngine->AddOnScreenDebugMessage(
+		GrappleKey,
+		0.f,
+		FColor::Cyan,
+		IsGrappling()
+			? FString::Printf(TEXT("Rope: %.0f cm"), RopeLength)
+			: FString(TEXT("Rope: -"))
+	);
+	
+	if (IsGrappling())
+		DrawDebugLine(GetWorld(), UpdatedComponent->GetComponentLocation(), GrappleAnchor, FColor::Green, false, -1.f, 0, 2.f);
 
 #endif
 }
@@ -193,6 +210,10 @@ void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations
 		
 	case EMPCustomMovementMode::WallRun:
 		PhysWallRun(deltaTime, Iterations);
+		break;
+		
+	case EMPCustomMovementMode::Grapple:
+		PhysGrapple(deltaTime, Iterations);
 		break;
 	
 	default:
@@ -319,6 +340,17 @@ void UMPCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iteration
 
 			return;
 		}
+	}
+}
+
+void UMPCharacterMovementComponent::PhysGrapple(float deltaTime, int32 Iterations)
+{
+	if (ShouldReleaseGrapple())
+	{
+		SetMovementMode(MOVE_Falling);
+		StartNewPhysics(deltaTime, Iterations);
+		
+		return;
 	}
 }
 
@@ -481,6 +513,12 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 		WallRunStartTime = GetWorld()->GetTimeSeconds();
 	}
 	
+	if (IsGrappling())
+	{
+		RopeLength = FVector::Dist(UpdatedComponent->GetComponentLocation(), GrappleAnchor);
+		GrappleStartTime = GetWorld()->GetTimeSeconds();
+	}
+	
 	if (PreviousMovementMode == MOVE_Custom)
 	{
 		EMPCustomMovementMode CustomMovementType = static_cast<EMPCustomMovementMode>(PreviousCustomMode);
@@ -493,6 +531,12 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 		
 		if (CustomMovementType == EMPCustomMovementMode::WallRun)
 			LastWall = CurrentWall;
+			
+		if (CustomMovementType == EMPCustomMovementMode::Grapple)
+		{
+			GrappleEndTime = GetWorld()->GetTimeSeconds();
+			bWantsToGrapple = false;
+		}
 	}
 	
 	if (MovementMode == MOVE_Walking)
@@ -646,3 +690,28 @@ bool UMPCharacterMovementComponent::CanWallKick() const
 	return FindKickableWall(Hit);
 }
 
+void UMPCharacterMovementComponent::RequestGrapple(const FVector& Anchor, const AActor* AnchorActor)
+{
+	GrappleAnchor = Anchor;
+	GrappleAnchorActor = AnchorActor;
+	bWantsToGrapple = true;
+}
+
+void UMPCharacterMovementComponent::ReleaseGrapple()
+{
+	bWantsToGrapple = false;
+}
+
+bool UMPCharacterMovementComponent::IsGrappling() const
+{
+	return IsCustomMovementMode(EMPCustomMovementMode::Grapple);
+}
+
+bool UMPCharacterMovementComponent::ShouldReleaseGrapple() const
+{
+	const bool bReleased = !bWantsToGrapple;
+	const bool bAnchorGone = !GrappleAnchorActor.IsValid();
+	const bool bTimedOut = GetWorld()->GetTimeSeconds() - GrappleStartTime >= GrappleMaxDuration;
+	
+	return bReleased || bAnchorGone || bTimedOut;
+}

@@ -188,7 +188,7 @@ void AMPCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 P
 	{
 		SetAnimRootMotionTranslationScale(1.f);
 
-		if (GetCharacterMovement()->MovementMode == MOVE_Falling)
+		if (GetCharacterMovement()->MovementMode != MOVE_Walking)
 		{
 			if (SlideMontage)
 			{
@@ -267,12 +267,13 @@ void AMPCharacter::DoSlideEnd()
 
 void AMPCharacter::DoGrappleStart()
 {
-	UE_LOG(LogMPMovement, Log, TEXT("Grapple pressed"));
+	if (AMPGrapplePoint* Target = GrappleTarget.Get())
+		GetMPMovement()->RequestGrapple(Target->GetAnchorLocation(), Target);
 }
 
 void AMPCharacter::DoGrappleEnd()
 {
-	UE_LOG(LogMPMovement, Log, TEXT("Grapple released"));
+	GetMPMovement()->ReleaseGrapple();
 }
 
 bool AMPCharacter::CanJumpInternal_Implementation() const
@@ -321,6 +322,9 @@ AMPGrapplePoint* AMPCharacter::FindBestGrapplePoint() const
 	{
 		AMPGrapplePoint* GrapplePoint = Cast<AMPGrapplePoint>(Candidate.GetActor());
 		if (!GrapplePoint)
+			continue;
+		
+		if (GetMPMovement()->IsGrappling() && GrapplePoint == GetMPMovement()->GetGrappleAnchorActor())
 			continue;
 
 		const FVector AnchorLocation = GrapplePoint->GetAnchorLocation();
