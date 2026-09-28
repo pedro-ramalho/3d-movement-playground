@@ -99,6 +99,21 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ClampMin = "0.0"))
 	float GrappleGravityScale = 1.f;
+	
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ClampMin = "0.0", ClampMax = "0.9"))
+	float GrappleReelFraction = 0.2f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float GrappleReelSpeed = 1200.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm", ClampMin = "0.0"))
+	float GrappleMinRopeLength = 300.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ClampMin = "0.0"))
+	float GrappleSwingControl = 600.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "s", ClampMin = "0.0"))
+	float GrappleFloorGraceTime = 0.2f;
 
 	/** In the air after a wall kick: no air braking, scaled air control, facing the flight direction */
 	bool bIsWallKickFlight = false;
@@ -113,6 +128,7 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	float WallRunStartTime = 0.f;
 	
 	float RopeLength = 0.f;
+	float TargetRopeLength = 0.f;
 	
 	float GrappleStartTime = 0.f;
 	float GrappleEndTime = -1000.f;

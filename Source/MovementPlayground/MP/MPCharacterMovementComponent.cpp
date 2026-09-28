@@ -190,7 +190,7 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 		0.f,
 		FColor::Cyan,
 		IsGrappling()
-			? FString::Printf(TEXT("Rope: %.0f cm"), RopeLength)
+			? FString::Printf(TEXT("Rope: %.0f / %.0f cm"), RopeLength, TargetRopeLength)
 			: FString(TEXT("Rope: -"))
 	);
 	
@@ -361,8 +361,15 @@ void UMPCharacterMovementComponent::PhysGrapple(float deltaTime, int32 Iteration
 		}
 		
 		RemainingTime -= TimeTick;
+		RopeLength = FMath::FInterpConstantTo(RopeLength, TargetRopeLength, TimeTick, GrappleReelSpeed);
 		
 		Velocity.Z += GetGravityZ() * GrappleGravityScale * TimeTick;
+		
+		const FVector RopeDirection = (GrappleAnchor - UpdatedComponent->GetComponentLocation()).GetSafeNormal();
+		const FVector Input = Acceleration / FMath::Max(GetMaxAcceleration(), 1.f);
+		const FVector SwingInput = FVector::VectorPlaneProject(Input, RopeDirection);
+		
+		Velocity += SwingInput * GrappleSwingControl * TimeTick;
 		
 		ApplyRopeToVelocity();
 		
@@ -377,6 +384,20 @@ void UMPCharacterMovementComponent::PhysGrapple(float deltaTime, int32 Iteration
 		}
 		
 		ApplyRopeToPosition();
+		
+		const bool bPastGrace = GetWorld()->GetTimeSeconds() - GrappleStartTime >= GrappleFloorGraceTime;
+		if (bPastGrace && Velocity.Z < 0.f)
+		{
+			FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
+
+			if (CurrentFloor.IsWalkableFloor() && CurrentFloor.FloorDist <= MAX_FLOOR_DIST)
+			{
+				SetMovementMode(MOVE_Walking);
+				StartNewPhysics(RemainingTime, Iterations);
+
+				return;
+			}
+		}
 	}
 }
 
@@ -554,6 +575,9 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 	if (IsGrappling())
 	{
 		RopeLength = FVector::Dist(UpdatedComponent->GetComponentLocation(), GrappleAnchor);
+		TargetRopeLength = FMath::Min(RopeLength, FMath::Max(GrappleMinRopeLength,
+			RopeLength * (1.f - GrappleReelFraction)));
+		
 		GrappleStartTime = GetWorld()->GetTimeSeconds();
 	}
 	

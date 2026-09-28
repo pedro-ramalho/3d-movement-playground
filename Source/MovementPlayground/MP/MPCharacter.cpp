@@ -74,7 +74,9 @@ void AMPCharacter::BeginPlay()
 void AMPCharacter::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
-	
+
+	UpdateGrappleShot();
+
 	AMPGrapplePoint* NewTarget = FindBestGrapplePoint();
 	AMPGrapplePoint* OldTarget = GrappleTarget.Get();
 
@@ -188,17 +190,23 @@ void AMPCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 P
 	
 	if (GrappleCable && GetMPMovement()->IsGrappling())
 	{
-		if (const AActor* AnchorActor = GetMPMovement()->GetGrappleAnchorActor())
+		const AActor* AnchorActor = GetMPMovement()->GetGrappleAnchorActor();
+		USceneComponent* AnchorComponent = AnchorActor ? AnchorActor->GetRootComponent() : nullptr;
+
+		if (AnchorComponent)
 		{
-			GrappleCable->SetAttachEndToComponent(AnchorActor->GetRootComponent());
-			GrappleCable->EndLocation = FVector::ZeroVector;
+			GrappleCable->SetAttachEndToComponent(AnchorComponent);
+			GrappleCable->EndLocation = AnchorComponent->GetComponentTransform().InverseTransformPosition(GrappleCable->GetComponentLocation());
 			GrappleCable->SetVisibility(true);
+
+			GrappleShotStartTime = GetWorld()->GetTimeSeconds();
 		}
 	}
 
 	if (GrappleCable && PrevMovementMode == MOVE_Custom && static_cast<EMPCustomMovementMode>(PreviousCustomMode) == EMPCustomMovementMode::Grapple)
 	{
 		GrappleCable->SetVisibility(false);
+		GrappleShotStartTime = -1.f;
 	}
 
 	if (PrevMovementMode == MOVE_Custom && static_cast<EMPCustomMovementMode>(PreviousCustomMode) == EMPCustomMovementMode::Slide)
@@ -310,6 +318,32 @@ void AMPCharacter::OnJumped_Implementation()
 	
 	if (GetMPMovement()->LastJumpWasWallKick() && WallKickMontage)
 		PlayAnimMontage(WallKickMontage);
+}
+
+void AMPCharacter::UpdateGrappleShot()
+{
+	if (GrappleShotStartTime < 0.f || !GrappleCable)
+		return;
+
+	const AActor* AnchorActor = GetMPMovement()->GetGrappleAnchorActor();
+	const USceneComponent* AnchorComponent = AnchorActor ? AnchorActor->GetRootComponent() : nullptr;
+
+	const float ShotAlpha = GrappleShotDuration > 0.f
+		? FMath::Clamp((GetWorld()->GetTimeSeconds() - GrappleShotStartTime) / GrappleShotDuration, 0.f, 1.f)
+		: 1.f;
+
+	if (!AnchorComponent || ShotAlpha >= 1.f)
+	{
+		GrappleCable->EndLocation = FVector::ZeroVector;
+		GrappleShotStartTime = -1.f;
+
+		return;
+	}
+
+	const float EasedAlpha = FMath::InterpEaseOut(0.f, 1.f, ShotAlpha, 2.f);
+	const FVector EndWorld = FMath::Lerp(GrappleCable->GetComponentLocation(), AnchorComponent->GetComponentLocation(), EasedAlpha);
+
+	GrappleCable->EndLocation = AnchorComponent->GetComponentTransform().InverseTransformPosition(EndWorld);
 }
 
 void AMPCharacter::SetupGrappleCable()

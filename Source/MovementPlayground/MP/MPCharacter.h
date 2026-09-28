@@ -62,6 +62,13 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm"))
 	float GrappleMinHeightAbove = 100.f;
 
+	/** How long the rope takes to fly from the hand to the grapple point (visual only) */
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "s", ClampMin = "0.0"))
+	float GrappleShotDuration = 0.12f;
+
+	/** When the current rope shot started; negative while no shot is in flight */
+	float GrappleShotStartTime = -1.f;
+
 	/** Camera Boom and Follow Camera Setup */
 	void SetupCameraBoom();
 	
@@ -77,7 +84,9 @@ private:
 	void OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload);
 	
 	AMPGrapplePoint* FindBestGrapplePoint() const;
-	
+
+	void UpdateGrappleShot();
+
 	TWeakObjectPtr<AMPGrapplePoint> GrappleTarget;
 	
 protected:
