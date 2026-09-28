@@ -132,8 +132,9 @@ float UMPCharacterMovementComponent::GetGrappleSwingAngle() const
 
 void UMPCharacterMovementComponent::TryEnterGrapple()
 {
-	const float CurrentTime = GetWorld()->GetTimeSeconds();
-	if (CurrentTime - GrappleEndTime >= GrappleCooldown)
+	const bool bCooldownReady = GetWorld()->GetTimeSeconds() - GrappleEndTime >= GrappleCooldown;
+
+	if (bWantsToGrapple && !IsGrappling() && bCooldownReady && GrappleAnchorActor.IsValid())
 	{
 		SetMovementMode(MOVE_Custom, static_cast<uint8>(EMPCustomMovementMode::Grapple));
 	}

@@ -133,6 +133,11 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	float GrappleStartTime = 0.f;
 	float GrappleEndTime = -1000.f;
 	
+	void EvalPreviousCustomMovementMode(const EMPCustomMovementMode Mode);
+	
+	void EvalCurrentCustomMovementMode(const EMPCustomMovementMode Mode);
+	
+	void LogMovementModeTransition(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) const;
 public:
 	UMPCharacterMovementComponent();
 	
@@ -195,9 +200,23 @@ public:
 protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
 	
+	// Slide Mechanic
 	void PhysSlide(float deltaTime, int32 Iterations);
 	
+	void TryEnterSlide();
+	
+	void OnEnterSlide();
+	
+	void OnExitSlide();
+	
+	// Wall Run Mechanic
 	void PhysWallRun(float deltaTime, int32 Iterations);
+	
+	void TryEnterWallRun();
+	
+	void OnEnterWallRun();
+	
+	void OnExitWallRun();
 	
 	// Grapple Mechanic
 	void PhysGrapple(float deltaTime, int32 Iterations);

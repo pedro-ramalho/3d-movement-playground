@@ -49,33 +49,10 @@ UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 
 void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
 {
-	const bool bCooldownReady = GetWorld()->GetTimeSeconds() - GrappleEndTime >= GrappleCooldown;
-	if (bWantsToGrapple && !IsGrappling() && bCooldownReady && GrappleAnchorActor.IsValid())
-		SetMovementMode(MOVE_Custom, static_cast<uint8>(EMPCustomMovementMode::Grapple));
+	TryEnterGrapple();
+	TryEnterSlide();
+	TryEnterWallRun();
 	
-	// Are we in walking mode?
-	if (MovementMode == MOVE_Walking)
-	{
-		// Do we want to slide?
-		if (bWantsToSlide)
-		{
-			// Do we have enough speed to slide?
-			if (Velocity.Size2D() >= SlideEnterSpeed)
-			{
-				SetMovementMode(MOVE_Custom, static_cast<uint8>(EMPCustomMovementMode::Slide));
-			}
-		}
-	}
-	
-	FHitResult WallHit;
-	bHasWallCandidate = MovementMode == MOVE_Falling && FindRunnableWall(WallHit);
-	if (bHasWallCandidate)
-	{
-		WallRunNormal = WallHit.ImpactNormal.GetSafeNormal2D();
-		CurrentWall = WallHit.GetComponent();
-		SetMovementMode(MOVE_Custom, static_cast<uint8>(EMPCustomMovementMode::WallRun));
-	}
-
 	FHitResult KickHit;
 	bHasKickCandidate = MovementMode == MOVE_Falling && FindKickableWall(KickHit);
 
@@ -487,72 +464,60 @@ FString UMPCharacterMovementComponent::MovementModeToString(EMovementMode Mode, 
 	return UEnum::GetValueAsString(CustomMovementType);
 }
 
+void UMPCharacterMovementComponent::EvalPreviousCustomMovementMode(const EMPCustomMovementMode Mode)
+{
+	switch (Mode)
+	{
+	case EMPCustomMovementMode::Slide: OnExitSlide(); break;
+	case EMPCustomMovementMode::WallRun: OnExitWallRun(); break;
+	case EMPCustomMovementMode::Grapple: OnExitGrapple(); break;
+	default: break;
+	}
+}
+
+void UMPCharacterMovementComponent::EvalCurrentCustomMovementMode(const EMPCustomMovementMode Mode)
+{
+	switch (Mode)
+	{
+	case EMPCustomMovementMode::Slide: OnEnterSlide(); break;
+	case EMPCustomMovementMode::WallRun: OnEnterWallRun(); break;
+	case EMPCustomMovementMode::Grapple: OnEnterGrapple(); break;
+	default: break;
+	}
+}
+
+void UMPCharacterMovementComponent::LogMovementModeTransition(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) const
+{
+	UE_LOG(LogMPMovement, Log, TEXT("From %s to %s"),
+		*MovementModeToString(PreviousMovementMode, PreviousCustomMode),
+		*MovementModeToString(MovementMode, CustomMovementMode));
+}
+
 void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode)
 {
 	Super::OnMovementModeChanged(PreviousMovementMode, PreviousCustomMode);
 	
-	if (IsCustomMovementMode(EMPCustomMovementMode::Slide))
-	{
-		bWantsToCrouch = true;
-		bCrouchMaintainsBaseLocation = true;
-		
-		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
-		AdjustFloorHeight();
-	}
-	
-	if (IsCustomMovementMode(EMPCustomMovementMode::WallRun))
-	{
-		FVector HVelocity = Velocity;
-		HVelocity.Z = 0.f;
-
-		const float OldVelocityZ = Velocity.Z;
-
-		const FVector AlongWall = FVector::VectorPlaneProject(HVelocity, WallRunNormal).GetSafeNormal();
-		Velocity = AlongWall * HVelocity.Size();
-		Velocity.Z = FMath::Clamp(OldVelocityZ * WallRunUpSpeedCarry, 0.f, WallRunMaxEntryUpSpeed);
-
-		WallRunStartTime = GetWorld()->GetTimeSeconds();
-	}
-	
-	if (IsGrappling())
-	{
-		RopeLength = FVector::Dist(UpdatedComponent->GetComponentLocation(), GrappleAnchor);
-		TargetRopeLength = FMath::Min(RopeLength, FMath::Max(GrappleMinRopeLength,
-			RopeLength * (1.f - GrappleReelFraction)));
-		
-		GrappleStartTime = GetWorld()->GetTimeSeconds();
-	}
-	
 	if (PreviousMovementMode == MOVE_Custom)
 	{
-		EMPCustomMovementMode CustomMovementType = static_cast<EMPCustomMovementMode>(PreviousCustomMode);
-		
-		if (CustomMovementType == EMPCustomMovementMode::Slide)
-		{
-			bWantsToCrouch = false;
-			bWantsToSlide = false;
-		}
-		
-		if (CustomMovementType == EMPCustomMovementMode::WallRun)
-			LastWall = CurrentWall;
-			
-		if (CustomMovementType == EMPCustomMovementMode::Grapple)
-		{
-			GrappleEndTime = GetWorld()->GetTimeSeconds();
-			bWantsToGrapple = false;
-		}
+		EvalPreviousCustomMovementMode(static_cast<EMPCustomMovementMode>(PreviousCustomMode));
+	}
+	
+	if (MovementMode == MOVE_Custom)
+	{
+		EvalCurrentCustomMovementMode(static_cast<EMPCustomMovementMode>(CustomMovementMode));
 	}
 	
 	if (MovementMode == MOVE_Walking)
+	{
 		LastWall.Reset();
-
-	if (MovementMode != MOVE_Falling)
-		bIsWallKickFlight = false;
+	}
 	
-	UE_LOG(LogMPMovement, Log, TEXT("From %s to %s"),
-		*MovementModeToString(PreviousMovementMode, PreviousCustomMode),
-		*MovementModeToString(MovementMode, CustomMovementMode)
-	);
+	if (MovementMode != MOVE_Falling)
+	{
+		bIsWallKickFlight = false;
+	}
+
+	LogMovementModeTransition(PreviousMovementMode, PreviousCustomMode);
 }
 
 bool UMPCharacterMovementComponent::FindRunnableWall(FHitResult& OutWallHit) const
