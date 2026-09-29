@@ -38,49 +38,6 @@ AMPCharacter::AMPCharacter(const FObjectInitializer& ObjectInitializer) : Super(
 	GrappleComponent = CreateDefaultSubobject<UMPGrappleComponent>(TEXT("GrappleComponent"));
 }
 
-void AMPCharacter::BeginPlay()
-{
-	Super::BeginPlay();
-
-	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
-	{
-		AnimInstance->OnPlayMontageNotifyBegin.AddDynamic(this, &AMPCharacter::OnMontageNotifyBegin);
-	}
-
-	SlideMontagePeakSpeed = MeasureSlideMontagePeakSpeed();
-}
-
-void AMPCharacter::OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload)
-{
-	if (NotifyName != SlideGetUpNotifyName || !GetMPMovement()->IsSliding())
-	{
-		return;
-	}
-
-	if (GetMPMovement()->CanStandUp())
-	{
-		return;
-	}
-
-	StopAnimMontage(SlideMontage);
-	GetMPMovement()->SetMovementMode(MOVE_Walking);
-}
-
-void AMPCharacter::SetupCameraBoom()
-{
-	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
-    CameraBoom->SetupAttachment(RootComponent);
-    CameraBoom->TargetArmLength = 400.0f;
-    CameraBoom->bUsePawnControlRotation = true;
-}
-
-void AMPCharacter::SetupFollowCamera()
-{
-	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
-	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
-	FollowCamera->bUsePawnControlRotation = false;
-}
-
 // Called to bind functionality to input
 void AMPCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
@@ -127,6 +84,152 @@ void AMPCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 P
 	{
 		EndSlideMontage();
 	}
+}
+
+void AMPCharacter::OnJumped_Implementation()
+{
+	Super::OnJumped_Implementation();
+	
+	if (GetMPMovement()->LastJumpWasWallKick() && WallKickMontage)
+		PlayAnimMontage(WallKickMontage);
+}
+
+void AMPCharacter::DoMove(float Right, float Forward)
+{
+	if (GetController() != nullptr)
+	{
+		const FRotator Rotation = GetController()->GetControlRotation();
+		const FRotator YawRotation(0, Rotation.Yaw, 0);
+
+		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
+
+		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
+
+		AddMovementInput(ForwardDirection, Forward);
+		AddMovementInput(RightDirection, Right);
+	}
+}
+
+void AMPCharacter::DoLook(float Yaw, float Pitch)
+{
+	if (GetController() != nullptr)
+	{
+		AddControllerYawInput(Yaw);
+		AddControllerPitchInput(Pitch);
+	}
+}
+
+void AMPCharacter::DoJumpStart()
+{
+	Jump();
+}
+
+void AMPCharacter::DoJumpEnd()
+{
+	StopJumping();
+}
+
+void AMPCharacter::DoSlideStart()
+{
+	GetMPMovement()->SetWantsToSlide(true);
+}
+
+void AMPCharacter::DoSlideEnd()
+{
+	GetMPMovement()->SetWantsToSlide(false);
+}
+
+void AMPCharacter::DoGrappleStart()
+{
+	GrappleComponent->StartGrapple();
+}
+
+void AMPCharacter::DoGrappleEnd()
+{
+	GrappleComponent->StopGrapple();
+}
+
+void AMPCharacter::BeginPlay()
+{
+	Super::BeginPlay();
+
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+	{
+		AnimInstance->OnPlayMontageNotifyBegin.AddDynamic(this, &AMPCharacter::OnMontageNotifyBegin);
+	}
+
+	SlideMontagePeakSpeed = MeasureSlideMontagePeakSpeed();
+}
+
+bool AMPCharacter::CanJumpInternal_Implementation() const
+{
+	if (GetMPMovement()->IsCustomMovementMode(EMPCustomMovementMode::Slide))
+		return JumpIsAllowedInternal();
+	
+	if (GetMPMovement()->CanWallKick())
+		return true;
+	
+	return Super::CanJumpInternal_Implementation();
+}
+
+void AMPCharacter::Move(const FInputActionValue &Value)
+{
+	const FVector2D MovementVector = Value.Get<FVector2D>();
+	
+	DoMove(MovementVector.X, MovementVector.Y);
+}
+
+void AMPCharacter::Look(const FInputActionValue &Value)
+{
+	FVector2D LookAxisVector = Value.Get<FVector2D>();
+	
+	DoLook(LookAxisVector.X, LookAxisVector.Y);
+}
+
+void AMPCharacter::OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload)
+{
+	if (NotifyName != SlideGetUpNotifyName || !GetMPMovement()->IsSliding())
+	{
+		return;
+	}
+
+	if (GetMPMovement()->CanStandUp())
+	{
+		return;
+	}
+
+	StopAnimMontage(SlideMontage);
+	GetMPMovement()->SetMovementMode(MOVE_Walking);
+}
+
+void AMPCharacter::SetupCameraBoom()
+{
+	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+    CameraBoom->SetupAttachment(RootComponent);
+    CameraBoom->TargetArmLength = 400.0f;
+    CameraBoom->bUsePawnControlRotation = true;
+}
+
+void AMPCharacter::SetupFollowCamera()
+{
+	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
+	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
+	FollowCamera->bUsePawnControlRotation = false;
+}
+
+void AMPCharacter::SetupGrappleCable()
+{
+	GrappleCable = CreateDefaultSubobject<UCableComponent>(TEXT("GrappleCable"));
+	GrappleCable->SetupAttachment(GetMesh(), TEXT("hand_r"));
+
+	GrappleCable->CableLength = 0.f;
+	GrappleCable->NumSegments = 8;
+	GrappleCable->SolverIterations = 4;
+	GrappleCable->bEnableStiffness = true;
+	GrappleCable->CableWidth = 3.f;
+	GrappleCable->bAttachEnd = true;
+
+	GrappleCable->SetVisibility(false);
 }
 
 float AMPCharacter::MeasureSlideMontagePeakSpeed() const
@@ -200,107 +303,3 @@ void AMPCharacter::EndSlideMontage()
 
 	StopAnimMontage(SlideMontage);
 }
-
-void AMPCharacter::Move(const FInputActionValue &Value)
-{
-	const FVector2D MovementVector = Value.Get<FVector2D>();
-	
-	DoMove(MovementVector.X, MovementVector.Y);
-}
-
-void AMPCharacter::Look(const FInputActionValue &Value)
-{
-	FVector2D LookAxisVector = Value.Get<FVector2D>();
-	
-	DoLook(LookAxisVector.X, LookAxisVector.Y);
-}
-
-void AMPCharacter::DoMove(float Right, float Forward)
-{
-	if (GetController() != nullptr)
-	{
-		const FRotator Rotation = GetController()->GetControlRotation();
-		const FRotator YawRotation(0, Rotation.Yaw, 0);
-
-		const FVector ForwardDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::X);
-
-		const FVector RightDirection = FRotationMatrix(YawRotation).GetUnitAxis(EAxis::Y);
-
-		AddMovementInput(ForwardDirection, Forward);
-		AddMovementInput(RightDirection, Right);
-	}
-}
-
-void AMPCharacter::DoLook(float Yaw, float Pitch)
-{
-	if (GetController() != nullptr)
-	{
-		AddControllerYawInput(Yaw);
-		AddControllerPitchInput(Pitch);
-	}
-}
-
-void AMPCharacter::DoJumpStart()
-{
-	Jump();
-}
-
-void AMPCharacter::DoJumpEnd()
-{
-	StopJumping();
-}
-
-void AMPCharacter::DoSlideStart()
-{
-	GetMPMovement()->SetWantsToSlide(true);
-}
-
-void AMPCharacter::DoSlideEnd()
-{
-	GetMPMovement()->SetWantsToSlide(false);
-}
-
-void AMPCharacter::DoGrappleStart()
-{
-	GrappleComponent->StartGrapple();
-}
-
-void AMPCharacter::DoGrappleEnd()
-{
-	GrappleComponent->StopGrapple();
-}
-
-bool AMPCharacter::CanJumpInternal_Implementation() const
-{
-	if (GetMPMovement()->IsCustomMovementMode(EMPCustomMovementMode::Slide))
-		return JumpIsAllowedInternal();
-	
-	if (GetMPMovement()->CanWallKick())
-		return true;
-	
-	return Super::CanJumpInternal_Implementation();
-}
-
-void AMPCharacter::OnJumped_Implementation()
-{
-	Super::OnJumped_Implementation();
-	
-	if (GetMPMovement()->LastJumpWasWallKick() && WallKickMontage)
-		PlayAnimMontage(WallKickMontage);
-}
-
-void AMPCharacter::SetupGrappleCable()
-{
-	GrappleCable = CreateDefaultSubobject<UCableComponent>(TEXT("GrappleCable"));
-	GrappleCable->SetupAttachment(GetMesh(), TEXT("hand_r"));
-
-	GrappleCable->CableLength = 0.f;
-	GrappleCable->NumSegments = 8;
-	GrappleCable->SolverIterations = 4;
-	GrappleCable->bEnableStiffness = true;
-	GrappleCable->CableWidth = 3.f;
-	GrappleCable->bAttachEnd = true;
-
-	GrappleCable->SetVisibility(false);
-}
-

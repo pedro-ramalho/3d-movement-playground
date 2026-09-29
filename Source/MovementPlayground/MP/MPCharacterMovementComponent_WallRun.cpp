@@ -4,6 +4,26 @@
 #include "MP/MPCharacterMovementComponent.h"
 #include "MP/MPMovementTypes.h"
 
+bool UMPCharacterMovementComponent::IsWallRunning() const
+{
+	return IsCustomMovementMode(EMPCustomMovementMode::WallRun);
+}
+
+float UMPCharacterMovementComponent::GetWallRunSide() const
+{
+	if (!IsWallRunning() || !CharacterOwner)
+		return 0.f;
+	
+	const float Product = FVector::DotProduct(WallRunNormal, CharacterOwner->GetActorRightVector());
+	
+	return Product > 0.f ? -1.f : 1.f;
+}
+
+bool UMPCharacterMovementComponent::CanWallKick() const
+{
+	return FindKickableWall().IsSet();
+}
+
 void UMPCharacterMovementComponent::TryEnterWallRun()
 {
 	const TOptional<FHitResult> WallHit = FindRunnableWall();
@@ -189,6 +209,14 @@ TOptional<FHitResult> UMPCharacterMovementComponent::FindRunnableWall() const
 	return WallHit;
 }
 
+void UMPCharacterMovementComponent::PerformWallJump()
+{
+	const FVector AlongWall(Velocity.X, Velocity.Y, 0.f);
+		
+	Velocity = AlongWall + WallRunNormal * WallJumpOutSpeed + FVector::UpVector * WallJumpUpSpeed;
+	SetMovementMode(MOVE_Falling);
+}
+
 TOptional<FHitResult> UMPCharacterMovementComponent::FindKickableWall() const
 {
 	if (!HasValidData() || MovementMode != MOVE_Falling)
@@ -238,34 +266,6 @@ TOptional<FHitResult> UMPCharacterMovementComponent::FindKickableWall() const
 	}
 
 	return KickHit;
-}
-
-bool UMPCharacterMovementComponent::CanWallKick() const
-{
-	return FindKickableWall().IsSet();
-}
-
-bool UMPCharacterMovementComponent::IsWallRunning() const
-{
-	return IsCustomMovementMode(EMPCustomMovementMode::WallRun);
-}
-
-float UMPCharacterMovementComponent::GetWallRunSide() const
-{
-	if (!IsWallRunning() || !CharacterOwner)
-		return 0.f;
-	
-	const float Product = FVector::DotProduct(WallRunNormal, CharacterOwner->GetActorRightVector());
-	
-	return Product > 0.f ? -1.f : 1.f;
-}
-
-void UMPCharacterMovementComponent::PerformWallJump()
-{
-	const FVector AlongWall(Velocity.X, Velocity.Y, 0.f);
-		
-	Velocity = AlongWall + WallRunNormal * WallJumpOutSpeed + FVector::UpVector * WallJumpUpSpeed;
-	SetMovementMode(MOVE_Falling);
 }
 
 void UMPCharacterMovementComponent::PerformWallKick(const FHitResult& KickHit)

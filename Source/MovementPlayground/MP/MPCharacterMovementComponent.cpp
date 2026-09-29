@@ -25,61 +25,10 @@ namespace
 }
 #endif
 
-bool UMPCharacterMovementComponent::IsDebugEnabled()
-{
-#if !UE_BUILD_SHIPPING
-	return CVarMPDebugMovement.GetValueOnGameThread() != 0;
-#else
-	return false;
-#endif
-}
-
-void UMPCharacterMovementComponent::PrintDebugMessage(EMPDebugKey Key, const FString& Message)
-{
-#if !UE_BUILD_SHIPPING
-	if (GEngine)
-	{
-		GEngine->AddOnScreenDebugMessage(static_cast<int32>(Key), 0.f, FColor::Cyan, Message);
-	}
-#endif
-}
-
-FColor UMPCharacterMovementComponent::GetDebugTraceColor(bool bHit, bool bAccepted)
-{
-	if (!bHit)
-	{
-		return FColor::Silver;
-	}
-
-	return bAccepted ? FColor::Green : FColor::Red;
-}
-
-void UMPCharacterMovementComponent::DrawDebugTraceLine(const FVector& Start, const FVector& End, const FColor& Color) const
-{
-#if !UE_BUILD_SHIPPING
-	if (IsDebugEnabled())
-	{
-		DrawDebugLine(GetWorld(), Start, End, Color, false, -1.f, 0, 1.5f);
-	}
-#endif
-}
-
-void UMPCharacterMovementComponent::DrawDebugTraceSphere(const FVector& Center, float Radius, const FColor& Color) const
-{
-#if !UE_BUILD_SHIPPING
-	if (IsDebugEnabled())
-	{
-		DrawDebugSphere(GetWorld(), Center, Radius, 12, Color, false, -1.f, 0, 1.f);
-	}
-#endif
-}
-
 UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 {
 	NavAgentProps.bCanCrouch = true;
-	
-	bWantsToSlide = false;
-	
+
 	// Rotation properties
 	bOrientRotationToMovement = true;
 	RotationRate = FRotator(0.0f, 500.0f, 0.0f);
@@ -136,27 +85,6 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 #endif
 }
 
-void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations)
-{
-	switch (static_cast<EMPCustomMovementMode>(CustomMovementMode))
-	{
-	case EMPCustomMovementMode::Slide:
-		PhysSlide(deltaTime, Iterations);
-		break;
-		
-	case EMPCustomMovementMode::WallRun:
-		PhysWallRun(deltaTime, Iterations);
-		break;
-		
-	case EMPCustomMovementMode::Grapple:
-		PhysGrapple(deltaTime, Iterations);
-		break;
-	
-	default:
-		break;
-	}
-}
-
 bool UMPCharacterMovementComponent::IsMovingOnGround() const
 {
 	if (IsCustomMovementMode(EMPCustomMovementMode::Slide))
@@ -174,16 +102,6 @@ bool UMPCharacterMovementComponent::CanAttemptJump() const
 		return IsJumpAllowed();
 		
 	return Super::CanAttemptJump();
-}
-
-bool UMPCharacterMovementComponent::IsCustomMovementMode(EMPCustomMovementMode Mode) const
-{
-	if (MovementMode != MOVE_Custom)
-		return false;
-	
-	EMPCustomMovementMode CustomMovementType = static_cast<EMPCustomMovementMode>(CustomMovementMode);
-	
-	return Mode == CustomMovementType;
 }
 
 bool UMPCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime)
@@ -210,7 +128,6 @@ FRotator UMPCharacterMovementComponent::ComputeOrientToMovementRotation(const FR
 	if (IsWallRunning() && !Velocity.IsNearlyZero())
 		return Velocity.GetSafeNormal2D().Rotation();
 
-	// Like Super Mario 64, the facing set by the kick holds for the whole flight
 	if (bIsWallKickFlight && IsFalling())
 		return CurrentRotation;
 
@@ -241,7 +158,6 @@ FVector UMPCharacterMovementComponent::GetAirControl(float DeltaTime, float Tick
 {
 	if (bIsWallKickFlight)
 	{
-		// Input can only stretch or shorten the kick along its own direction, not steer it
 		const FVector KickDirection = UpdatedComponent->GetForwardVector().GetSafeNormal2D();
 		const FVector AlongKick = KickDirection * FVector::DotProduct(FallAcceleration, KickDirection);
 
@@ -249,6 +165,16 @@ FVector UMPCharacterMovementComponent::GetAirControl(float DeltaTime, float Tick
 	}
 
 	return Super::GetAirControl(DeltaTime, TickAirControl, FallAcceleration);
+}
+
+bool UMPCharacterMovementComponent::IsCustomMovementMode(EMPCustomMovementMode Mode) const
+{
+	if (MovementMode != MOVE_Custom)
+		return false;
+	
+	EMPCustomMovementMode CustomMovementType = static_cast<EMPCustomMovementMode>(CustomMovementMode);
+	
+	return Mode == CustomMovementType;
 }
 
 FString UMPCharacterMovementComponent::MovementModeToString(EMovementMode Mode, uint8 CustomMode)
@@ -263,33 +189,44 @@ FString UMPCharacterMovementComponent::MovementModeToString(EMovementMode Mode, 
 	return UEnum::GetValueAsString(CustomMovementType);
 }
 
-void UMPCharacterMovementComponent::EvalPreviousCustomMovementMode(const EMPCustomMovementMode Mode)
+bool UMPCharacterMovementComponent::IsDebugEnabled()
 {
-	switch (Mode)
-	{
-	case EMPCustomMovementMode::Slide: OnExitSlide(); break;
-	case EMPCustomMovementMode::WallRun: OnExitWallRun(); break;
-	case EMPCustomMovementMode::Grapple: OnExitGrapple(); break;
-	default: break;
-	}
+#if !UE_BUILD_SHIPPING
+	return CVarMPDebugMovement.GetValueOnGameThread() != 0;
+#else
+	return false;
+#endif
 }
 
-void UMPCharacterMovementComponent::EvalCurrentCustomMovementMode(const EMPCustomMovementMode Mode)
+void UMPCharacterMovementComponent::PrintDebugMessage(EMPDebugKey Key, const FString& Message)
 {
-	switch (Mode)
+#if !UE_BUILD_SHIPPING
+	if (GEngine)
 	{
-	case EMPCustomMovementMode::Slide: OnEnterSlide(); break;
-	case EMPCustomMovementMode::WallRun: OnEnterWallRun(); break;
-	case EMPCustomMovementMode::Grapple: OnEnterGrapple(); break;
-	default: break;
+		GEngine->AddOnScreenDebugMessage(static_cast<int32>(Key), 0.f, FColor::Cyan, Message);
 	}
+#endif
 }
 
-void UMPCharacterMovementComponent::LogMovementModeTransition(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) const
+void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations)
 {
-	UE_LOG(LogMPMovement, Log, TEXT("From %s to %s"),
-		*MovementModeToString(PreviousMovementMode, PreviousCustomMode),
-		*MovementModeToString(MovementMode, CustomMovementMode));
+	switch (static_cast<EMPCustomMovementMode>(CustomMovementMode))
+	{
+	case EMPCustomMovementMode::Slide:
+		PhysSlide(deltaTime, Iterations);
+		break;
+		
+	case EMPCustomMovementMode::WallRun:
+		PhysWallRun(deltaTime, Iterations);
+		break;
+		
+	case EMPCustomMovementMode::Grapple:
+		PhysGrapple(deltaTime, Iterations);
+		break;
+	
+	default:
+		break;
+	}
 }
 
 void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode)
@@ -335,4 +272,63 @@ void UMPCharacterMovementComponent::MoveAndSlide(const FVector& Delta, float Tim
 		HandleImpact(Hit, TimeTick, Delta);
 		SlideAlongSurface(Delta, 1.f - Hit.Time, Hit.Normal, Hit, true);
 	}
+}
+
+void UMPCharacterMovementComponent::EvalPreviousCustomMovementMode(const EMPCustomMovementMode Mode)
+{
+	switch (Mode)
+	{
+	case EMPCustomMovementMode::Slide: OnExitSlide(); break;
+	case EMPCustomMovementMode::WallRun: OnExitWallRun(); break;
+	case EMPCustomMovementMode::Grapple: OnExitGrapple(); break;
+	default: break;
+	}
+}
+
+void UMPCharacterMovementComponent::EvalCurrentCustomMovementMode(const EMPCustomMovementMode Mode)
+{
+	switch (Mode)
+	{
+	case EMPCustomMovementMode::Slide: OnEnterSlide(); break;
+	case EMPCustomMovementMode::WallRun: OnEnterWallRun(); break;
+	case EMPCustomMovementMode::Grapple: OnEnterGrapple(); break;
+	default: break;
+	}
+}
+
+void UMPCharacterMovementComponent::LogMovementModeTransition(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) const
+{
+	UE_LOG(LogMPMovement, Log, TEXT("From %s to %s"),
+		*MovementModeToString(PreviousMovementMode, PreviousCustomMode),
+		*MovementModeToString(MovementMode, CustomMovementMode));
+}
+
+FColor UMPCharacterMovementComponent::GetDebugTraceColor(bool bHit, bool bAccepted)
+{
+	if (!bHit)
+	{
+		return FColor::Silver;
+	}
+
+	return bAccepted ? FColor::Green : FColor::Red;
+}
+
+void UMPCharacterMovementComponent::DrawDebugTraceLine(const FVector& Start, const FVector& End, const FColor& Color) const
+{
+#if !UE_BUILD_SHIPPING
+	if (IsDebugEnabled())
+	{
+		DrawDebugLine(GetWorld(), Start, End, Color, false, -1.f, 0, 1.5f);
+	}
+#endif
+}
+
+void UMPCharacterMovementComponent::DrawDebugTraceSphere(const FVector& Center, float Radius, const FColor& Color) const
+{
+#if !UE_BUILD_SHIPPING
+	if (IsDebugEnabled())
+	{
+		DrawDebugSphere(GetWorld(), Center, Radius, 12, Color, false, -1.f, 0, 1.f);
+	}
+#endif
 }

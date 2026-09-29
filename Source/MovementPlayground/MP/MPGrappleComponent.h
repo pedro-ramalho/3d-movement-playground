@@ -1,5 +1,3 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #pragma once
 
 #include "CoreMinimal.h"
@@ -35,9 +33,9 @@ private:
 	UFUNCTION()
 	void OnMovementModeChanged(ACharacter* InCharacter, EMovementMode PrevMovementMode, uint8 PreviousCustomMode);
 
-	AMPGrapplePoint* FindBestGrapplePoint() const;
-
 	void UpdateGrappleTarget();
+
+	AMPGrapplePoint* FindBestGrapplePoint() const;
 
 	void StartGrappleShot();
 
@@ -45,6 +43,7 @@ private:
 
 	void HideGrappleCable();
 
+private:
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm"))
 	float GrappleMaxRange = 2500.f;
 

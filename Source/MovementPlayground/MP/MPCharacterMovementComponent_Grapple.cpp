@@ -20,12 +20,42 @@ bool UMPCharacterMovementComponent::IsGrappling() const
 	return IsCustomMovementMode(EMPCustomMovementMode::Grapple);
 }
 
-bool UMPCharacterMovementComponent::ShouldReleaseGrapple() const
+float UMPCharacterMovementComponent::GetGrappleSwingAngle() const
 {
-	const bool bReleased = !bWantsToGrapple;
-	const bool bAnchorGone = !GrappleAnchorActor.IsValid();
+	if (!IsGrappling() || !CharacterOwner)
+		return 0.f;
+	
+	const FVector Rope = GrappleAnchor - UpdatedComponent->GetComponentLocation();
+	const FVector Forward = CharacterOwner->GetActorForwardVector().GetSafeNormal2D();
+	
+	return FMath::RadiansToDegrees(FMath::Atan2(-FVector::DotProduct(Rope, Forward), Rope.Z));
+}
 
-	return bReleased || bAnchorGone;
+void UMPCharacterMovementComponent::TryEnterGrapple()
+{
+	const bool bCooldownReady = GetWorld()->GetTimeSeconds() - GrappleEndTime >= GrappleCooldown;
+
+	if (bWantsToGrapple && !IsGrappling() && bCooldownReady && GrappleAnchorActor.IsValid())
+	{
+		SetMovementMode(MOVE_Custom, static_cast<uint8>(EMPCustomMovementMode::Grapple));
+	}
+}
+
+void UMPCharacterMovementComponent::OnEnterGrapple()
+{
+	RopeLength = FVector::Dist(UpdatedComponent->GetComponentLocation(), GrappleAnchor);
+	TargetRopeLength = FMath::Min(RopeLength, 
+		FMath::Max(GrappleMinRopeLength,
+		RopeLength * (1.f - GrappleReelFraction))
+	);
+		
+	GrappleStartTime = GetWorld()->GetTimeSeconds();
+}
+
+void UMPCharacterMovementComponent::OnExitGrapple()
+{
+	GrappleEndTime = GetWorld()->GetTimeSeconds();
+	bWantsToGrapple = false;
 }
 
 void UMPCharacterMovementComponent::PhysGrapple(float deltaTime, int32 Iterations)
@@ -66,6 +96,14 @@ void UMPCharacterMovementComponent::PhysGrapple(float deltaTime, int32 Iteration
 			}
 		}
 	}
+}
+
+bool UMPCharacterMovementComponent::ShouldReleaseGrapple() const
+{
+	const bool bReleased = !bWantsToGrapple;
+	const bool bAnchorGone = !GrappleAnchorActor.IsValid();
+
+	return bReleased || bAnchorGone;
 }
 
 void UMPCharacterMovementComponent::UpdateGrappleReel(float TimeTick)
@@ -113,42 +151,4 @@ void UMPCharacterMovementComponent::ApplyRopeToPosition()
 	SafeMoveUpdatedComponent(Target - Location, UpdatedComponent->GetComponentQuat(), true, Hit);
 	
 	ApplyRopeToVelocity();
-}
-
-float UMPCharacterMovementComponent::GetGrappleSwingAngle() const
-{
-	if (!IsGrappling() || !CharacterOwner)
-		return 0.f;
-	
-	const FVector Rope = GrappleAnchor - UpdatedComponent->GetComponentLocation();
-	const FVector Forward = CharacterOwner->GetActorForwardVector().GetSafeNormal2D();
-	
-	return FMath::RadiansToDegrees(FMath::Atan2(-FVector::DotProduct(Rope, Forward), Rope.Z));
-}
-
-void UMPCharacterMovementComponent::TryEnterGrapple()
-{
-	const bool bCooldownReady = GetWorld()->GetTimeSeconds() - GrappleEndTime >= GrappleCooldown;
-
-	if (bWantsToGrapple && !IsGrappling() && bCooldownReady && GrappleAnchorActor.IsValid())
-	{
-		SetMovementMode(MOVE_Custom, static_cast<uint8>(EMPCustomMovementMode::Grapple));
-	}
-}
-
-void UMPCharacterMovementComponent::OnEnterGrapple()
-{
-	RopeLength = FVector::Dist(UpdatedComponent->GetComponentLocation(), GrappleAnchor);
-	TargetRopeLength = FMath::Min(RopeLength, 
-		FMath::Max(GrappleMinRopeLength,
-		RopeLength * (1.f - GrappleReelFraction))
-	);
-		
-	GrappleStartTime = GetWorld()->GetTimeSeconds();
-}
-
-void UMPCharacterMovementComponent::OnExitGrapple()
-{
-	GrappleEndTime = GetWorld()->GetTimeSeconds();
-	bWantsToGrapple = false;
 }

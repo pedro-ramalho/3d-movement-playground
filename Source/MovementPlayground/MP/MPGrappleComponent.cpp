@@ -16,34 +16,6 @@ UMPGrappleComponent::UMPGrappleComponent()
 	PrimaryComponentTick.bCanEverTick = true;
 }
 
-void UMPGrappleComponent::BeginPlay()
-{
-	Super::BeginPlay();
-
-	Character = Cast<ACharacter>(GetOwner());
-
-	if (!Character)
-	{
-		return;
-	}
-
-	Movement = Cast<UMPCharacterMovementComponent>(Character->GetCharacterMovement());
-	Camera = Character->FindComponentByClass<UCameraComponent>();
-	GrappleCable = Character->FindComponentByClass<UCableComponent>();
-
-	Character->MovementModeChangedDelegate.AddDynamic(this, &UMPGrappleComponent::OnMovementModeChanged);
-}
-
-void UMPGrappleComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
-{
-	if (Character)
-	{
-		Character->MovementModeChangedDelegate.RemoveDynamic(this, &UMPGrappleComponent::OnMovementModeChanged);
-	}
-
-	Super::EndPlay(EndPlayReason);
-}
-
 void UMPGrappleComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
@@ -76,6 +48,34 @@ void UMPGrappleComponent::StopGrapple()
 	{
 		Movement->ReleaseGrapple();
 	}
+}
+
+void UMPGrappleComponent::BeginPlay()
+{
+	Super::BeginPlay();
+
+	Character = Cast<ACharacter>(GetOwner());
+
+	if (!Character)
+	{
+		return;
+	}
+
+	Movement = Cast<UMPCharacterMovementComponent>(Character->GetCharacterMovement());
+	Camera = Character->FindComponentByClass<UCameraComponent>();
+	GrappleCable = Character->FindComponentByClass<UCableComponent>();
+
+	Character->MovementModeChangedDelegate.AddDynamic(this, &UMPGrappleComponent::OnMovementModeChanged);
+}
+
+void UMPGrappleComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (Character)
+	{
+		Character->MovementModeChangedDelegate.RemoveDynamic(this, &UMPGrappleComponent::OnMovementModeChanged);
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void UMPGrappleComponent::OnMovementModeChanged(ACharacter* InCharacter, EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
