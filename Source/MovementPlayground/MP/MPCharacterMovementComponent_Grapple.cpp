@@ -44,16 +44,10 @@ void UMPCharacterMovementComponent::PhysGrapple(float deltaTime, int32 Iteration
 		}
 		
 		RemainingTime -= TimeTick;
-		RopeLength = FMath::FInterpConstantTo(RopeLength, TargetRopeLength, TimeTick, GrappleReelSpeed);
-		
+		UpdateGrappleReel(TimeTick);
+
 		Velocity.Z += GetGravityZ() * GrappleGravityScale * TimeTick;
-		
-		const FVector RopeDirection = (GrappleAnchor - UpdatedComponent->GetComponentLocation()).GetSafeNormal();
-		const FVector Input = Acceleration / FMath::Max(GetMaxAcceleration(), 1.f);
-		const FVector SwingInput = FVector::VectorPlaneProject(Input, RopeDirection);
-		
-		Velocity += SwingInput * GrappleSwingControl * TimeTick;
-		
+		ApplyGrappleSwingInput(TimeTick);
 		ApplyRopeToVelocity();
 		
 		MoveAndSlide(Velocity * TimeTick, TimeTick);
@@ -72,6 +66,20 @@ void UMPCharacterMovementComponent::PhysGrapple(float deltaTime, int32 Iteration
 			}
 		}
 	}
+}
+
+void UMPCharacterMovementComponent::UpdateGrappleReel(float TimeTick)
+{
+	RopeLength = FMath::FInterpConstantTo(RopeLength, TargetRopeLength, TimeTick, GrappleReelSpeed);
+}
+
+void UMPCharacterMovementComponent::ApplyGrappleSwingInput(float TimeTick)
+{
+	const FVector RopeDirection = (GrappleAnchor - UpdatedComponent->GetComponentLocation()).GetSafeNormal();
+	const FVector Input = Acceleration / FMath::Max(GetMaxAcceleration(), 1.f);
+	const FVector SwingInput = FVector::VectorPlaneProject(Input, RopeDirection);
+
+	Velocity += SwingInput * GrappleSwingControl * TimeTick;
 }
 
 void UMPCharacterMovementComponent::ApplyRopeToVelocity()

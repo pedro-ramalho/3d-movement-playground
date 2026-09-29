@@ -240,8 +240,12 @@ protected:
 
 	void OnExitGrapple();
 
-	bool ShouldReleaseGrapple() const;
-	
+	[[nodiscard]] bool ShouldReleaseGrapple() const;
+
+	void UpdateGrappleReel(float TimeTick);
+
+	void ApplyGrappleSwingInput(float TimeTick);
+
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	
 	[[nodiscard]] bool IsWallSurface(const FVector& Normal) const;
