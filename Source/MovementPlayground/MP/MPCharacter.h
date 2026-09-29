@@ -21,8 +21,8 @@ UCLASS()
 class MOVEMENTPLAYGROUND_API AMPCharacter : public ACharacter
 {
 	GENERATED_BODY()
-
-private:
+	
+	// Components
 	UPROPERTY(Transient)
 	TObjectPtr<UMPCharacterMovementComponent> MPMovement;
 	
@@ -32,15 +32,20 @@ private:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCameraComponent> FollowCamera;
 	
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UCableComponent> GrappleCable;
+	
+	// Animation Montages
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
 	TObjectPtr<UAnimMontage> SlideMontage;
 	
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
 	TObjectPtr<UAnimMontage> WallKickMontage;
+
+	UFUNCTION()
+	void OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload);
 	
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
-	TObjectPtr<UCableComponent> GrappleCable;
-	
+	// Slide-Specific Properties
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide")
 	float SlideSpeedMultiplier = 1.2f;
 	
@@ -50,9 +55,7 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.1"))
 	float SlideRootMotionScaleMax = 2.5f;
 
-	/** Measured from SlideMontage in BeginPlay, not tuned */
-	float SlideMontagePeakSpeed = 0.f;
-	
+	// Grapple-Specific Properties
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm"))
 	float GrappleMaxRange = 2500.f;
 	
@@ -62,37 +65,38 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm"))
 	float GrappleMinHeightAbove = 100.f;
 
-	/** How long the rope takes to fly from the hand to the grapple point (visual only) */
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "s", ClampMin = "0.0"))
 	float GrappleShotDuration = 0.12f;
+	
+	// Runtime State
+	float SlideMontagePeakSpeed = 0.f;
+	
+	static const FName SlideGetUpNotifyName;
 
-	/** When the current rope shot started; negative while no shot is in flight */
 	float GrappleShotStartTime = -1.f;
+	
+	TWeakObjectPtr<AMPGrapplePoint> GrappleTarget;
 
-	/** Camera Boom and Follow Camera Setup */
+	// Setup Methods
 	void SetupCameraBoom();
 	
 	void SetupFollowCamera();
 	
 	void SetupGrappleCable();
-
-	/** Name of the Montage Notify in the slide montage where the get-up begins */
-	static const FName SlideGetUpNotifyName;
-
-	/** Receives the Montage Notifies of every montage this character plays */
-	UFUNCTION()
-	void OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload);
 	
+	// Helper Methods
 	AMPGrapplePoint* FindBestGrapplePoint() const;
 
 	void UpdateGrappleShot();
-
-	TWeakObjectPtr<AMPGrapplePoint> GrappleTarget;
 	
 protected:
+	// Overrides from ACharacter 
 	virtual void BeginPlay() override;
-
-	/** Jump Input Action */
+	
+	virtual bool CanJumpInternal_Implementation() const override;
+	// End overrides from ACharacter
+	
+	// Input Actions
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> JumpAction;
 
@@ -102,36 +106,34 @@ protected:
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> GrappleAction;
 	
-	/** Move Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> MoveAction;
 
-	/** Look Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> LookAction;
 
-	/** Mouse Look Input Action */
 	UPROPERTY(EditAnywhere, Category="Input")
 	TObjectPtr<UInputAction> MouseLookAction;
 	
-	/** Called for movement */
+	// Input Handlers
 	void Move(const FInputActionValue& Value);
 	
-	/** Called for looking */
 	void Look(const FInputActionValue& Value);
 
-	virtual bool CanJumpInternal_Implementation() const override;
-	
-	
 public:
-	// Sets default values for this character's properties
 	AMPCharacter(const FObjectInitializer& ObjectInitializer);
 
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
+	// Start overrides from ACharacter
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
 	
 	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
 	
+	virtual void OnJumped_Implementation() override;
+	
+	virtual void Tick(float DeltaSeconds) override;
+	// End overrides from ACharacter
+	
+	// Input Handlers
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoMove(float Right, float Forward);
 
@@ -156,13 +158,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoGrappleEnd();
 	
+	// Getters
 	FORCEINLINE UMPCharacterMovementComponent* GetMPMovement() const { return MPMovement; }
 	
 	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
 	
 	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
-	
-	virtual void OnJumped_Implementation() override;
-	
-	virtual void Tick(float DeltaSeconds) override;
 };
