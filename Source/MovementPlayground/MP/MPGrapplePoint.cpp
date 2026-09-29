@@ -21,9 +21,7 @@ void AMPGrapplePoint::SetHighlighted(bool bInHighlighted)
 
 	bIsHighlighted = bInHighlighted;
 
-	UMaterialInterface* Material = bIsHighlighted ? HighlightMaterial : NormalMaterial;
-
-	if (Material)
+	if (UMaterialInterface* Material = bIsHighlighted ? HighlightMaterial : NormalMaterial)
 	{
 		Mesh->SetMaterial(0, Material);
 	}

@@ -15,9 +15,6 @@ public class MovementPlayground : ModuleRules
 			"CableComponent",
 			"InputCore",
 			"EnhancedInput",
-			"AIModule",
-			"StateTreeModule",
-			"GameplayStateTreeModule",
 			"UMG",
 			"Slate"
 		});
@@ -25,20 +22,7 @@ public class MovementPlayground : ModuleRules
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
 		PublicIncludePaths.AddRange(new string[] {
-			"MovementPlayground",
-			"MovementPlayground/Variant_Platforming",
-			"MovementPlayground/Variant_Platforming/Animation",
-			"MovementPlayground/Variant_Combat",
-			"MovementPlayground/Variant_Combat/AI",
-			"MovementPlayground/Variant_Combat/Animation",
-			"MovementPlayground/Variant_Combat/Gameplay",
-			"MovementPlayground/Variant_Combat/Interfaces",
-			"MovementPlayground/Variant_Combat/UI",
-			"MovementPlayground/Variant_SideScrolling",
-			"MovementPlayground/Variant_SideScrolling/AI",
-			"MovementPlayground/Variant_SideScrolling/Gameplay",
-			"MovementPlayground/Variant_SideScrolling/Interfaces",
-			"MovementPlayground/Variant_SideScrolling/UI"
+			"MovementPlayground"
 		});
 
 		// Uncomment if you are using Slate UI

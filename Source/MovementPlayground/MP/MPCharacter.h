@@ -13,7 +13,7 @@ class UCameraComponent;
 class UInputAction;
 class UAnimMontage;
 class UCableComponent;
-class AMPGrapplePoint;
+class UMPGrappleComponent;
 
 struct FInputActionValue;
 
@@ -22,147 +22,136 @@ class MOVEMENTPLAYGROUND_API AMPCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
+public:
+	AMPCharacter(const FObjectInitializer& ObjectInitializer);
+
+	// Start overrides from ACharacter
+	virtual void SetupPlayerInputComponent(UInputComponent* PlayerInputComponent) override;
+
+	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
+
+	virtual void OnJumped_Implementation() override;
+	// End overrides from ACharacter
+
+	// Input Handlers
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoMove(float Right, float Forward);
+
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoLook(float Yaw, float Pitch);
+
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoJumpStart();
+
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoJumpEnd();
+
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoSlideStart();
+
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoSlideEnd();
+
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoGrappleStart();
+
+	UFUNCTION(BlueprintCallable, Category="Input")
+	virtual void DoGrappleEnd();
+
+	// Getters
+	FORCEINLINE UMPCharacterMovementComponent* GetMPMovement() const { return MPMovement; }
+
+	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
+
+	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
+
+protected:
+	// Overrides from ACharacter
+	virtual void BeginPlay() override;
+
+	virtual bool CanJumpInternal_Implementation() const override;
+	// End overrides from ACharacter
+
+	// Input Handlers
+	void Move(const FInputActionValue& Value);
+
+	void Look(const FInputActionValue& Value);
+
+protected:
+	// Input Actions
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> JumpAction;
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> SlideAction;
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> GrappleAction;
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> MoveAction;
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> LookAction;
+
+	UPROPERTY(EditAnywhere, Category="Input")
+	TObjectPtr<UInputAction> MouseLookAction;
+
 private:
+	UFUNCTION()
+	void OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload);
+
+	// Setup Methods
+	void SetupCameraBoom();
+
+	void SetupFollowCamera();
+
+	void SetupGrappleCable();
+
+	[[nodiscard]] float MeasureSlideMontagePeakSpeed() const;
+
+	[[nodiscard]] float ComputeSlideRootMotionScale(float EntrySpeed) const;
+
+	void StartSlideMontage();
+
+	void EndSlideMontage();
+
+private:
+	// Components
 	UPROPERTY(Transient)
 	TObjectPtr<UMPCharacterMovementComponent> MPMovement;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<USpringArmComponent> CameraBoom;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCameraComponent> FollowCamera;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
-	TObjectPtr<UAnimMontage> SlideMontage;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
-	TObjectPtr<UAnimMontage> WallKickMontage;
-	
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCableComponent> GrappleCable;
-	
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMPGrappleComponent> GrappleComponent;
+
+	// Animation Montages
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
+	TObjectPtr<UAnimMontage> SlideMontage;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
+	TObjectPtr<UAnimMontage> WallKickMontage;
+
+	// Slide-Specific Properties
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide")
 	float SlideSpeedMultiplier = 1.2f;
-	
+
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.1"))
 	float SlideRootMotionScaleMin = 0.5f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.1"))
 	float SlideRootMotionScaleMax = 2.5f;
 
-	/** Measured from SlideMontage in BeginPlay, not tuned */
+	// Runtime State
 	float SlideMontagePeakSpeed = 0.f;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm"))
-	float GrappleMaxRange = 2500.f;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "deg"))
-	float GrappleAimAngle = 20.f;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm"))
-	float GrappleMinHeightAbove = 100.f;
 
-	/** How long the rope takes to fly from the hand to the grapple point (visual only) */
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "s", ClampMin = "0.0"))
-	float GrappleShotDuration = 0.12f;
-
-	/** When the current rope shot started; negative while no shot is in flight */
-	float GrappleShotStartTime = -1.f;
-
-	/** Camera Boom and Follow Camera Setup */
-	void SetupCameraBoom();
-	
-	void SetupFollowCamera();
-	
-	void SetupGrappleCable();
-
-	/** Name of the Montage Notify in the slide montage where the get-up begins */
 	static const FName SlideGetUpNotifyName;
-
-	/** Receives the Montage Notifies of every montage this character plays */
-	UFUNCTION()
-	void OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload);
-	
-	AMPGrapplePoint* FindBestGrapplePoint() const;
-
-	void UpdateGrappleShot();
-
-	TWeakObjectPtr<AMPGrapplePoint> GrappleTarget;
-	
-protected:
-	virtual void BeginPlay() override;
-
-	/** Jump Input Action */
-	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputAction> JumpAction;
-
-	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputAction> SlideAction;
-	
-	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputAction> GrappleAction;
-	
-	/** Move Input Action */
-	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputAction> MoveAction;
-
-	/** Look Input Action */
-	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputAction> LookAction;
-
-	/** Mouse Look Input Action */
-	UPROPERTY(EditAnywhere, Category="Input")
-	TObjectPtr<UInputAction> MouseLookAction;
-	
-	/** Called for movement */
-	void Move(const FInputActionValue& Value);
-	
-	/** Called for looking */
-	void Look(const FInputActionValue& Value);
-
-	virtual bool CanJumpInternal_Implementation() const override;
-	
-	
-public:
-	// Sets default values for this character's properties
-	AMPCharacter(const FObjectInitializer& ObjectInitializer);
-
-	// Called to bind functionality to input
-	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
-	
-	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
-	
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoMove(float Right, float Forward);
-
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoLook(float Yaw, float Pitch);
-	
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoJumpStart();
-	
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoJumpEnd();
-	
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoSlideStart();
-	
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoSlideEnd();
-	
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoGrappleStart();
-	
-	UFUNCTION(BlueprintCallable, Category="Input")
-	virtual void DoGrappleEnd();
-	
-	FORCEINLINE UMPCharacterMovementComponent* GetMPMovement() const { return MPMovement; }
-	
-	FORCEINLINE USpringArmComponent* GetCameraBoom() const { return CameraBoom; }
-	
-	FORCEINLINE UCameraComponent* GetFollowCamera() const { return FollowCamera; }
-	
-	virtual void OnJumped_Implementation() override;
-	
-	virtual void Tick(float DeltaSeconds) override;
 };
