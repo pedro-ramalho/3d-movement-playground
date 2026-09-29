@@ -4,7 +4,6 @@
 #include "MP/MPMovementTypes.h"
 
 #include "GameFramework/Character.h"
-#include "Components/CapsuleComponent.h"
 #include "DrawDebugHelpers.h"
 
 DEFINE_LOG_CATEGORY(LogMPMovement);
@@ -59,55 +58,12 @@ void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float Del
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
 }
 
-void UMPCharacterMovementComponent::SetWantsToSlide(bool bWants)
-{
-	bWantsToSlide = bWants;
-}
-
-bool UMPCharacterMovementComponent::CanStandUp() const
-{
-	if (!HasValidData())
-	{
-		return false;
-	}
-
-	// Same test as UCharacterMovementComponent::UnCrouch, for the bCrouchMaintainsBaseLocation case
-	const UCapsuleComponent* Capsule = CharacterOwner->GetCapsuleComponent();
-	const ACharacter* DefaultCharacter = CharacterOwner->GetClass()->GetDefaultObject<ACharacter>();
-
-	const float HalfHeightAdjust = DefaultCharacter->GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() - Capsule->GetUnscaledCapsuleHalfHeight();
-	const float ScaledHalfHeightAdjust = HalfHeightAdjust * Capsule->GetShapeScale();
-
-	// Slightly taller than standing, so a ceiling at exactly standing height still blocks
-	const float SweepInflation = UE_KINDA_SMALL_NUMBER * 10.f;
-	const FCollisionShape StandingCapsuleShape = GetPawnCapsuleCollisionShape(SHRINK_HeightCustom, -SweepInflation - ScaledHalfHeightAdjust);
-
-	// The feet stay put, so the standing capsule's center sits higher than the current one
-	const FVector StandingLocation = UpdatedComponent->GetComponentLocation()
-		+ (StandingCapsuleShape.GetCapsuleHalfHeight() - Capsule->GetScaledCapsuleHalfHeight()) * -GetGravityDirection();
-
-	FCollisionQueryParams CapsuleParams(SCENE_QUERY_STAT(MPStandUpTest), false, CharacterOwner);
-	FCollisionResponseParams ResponseParams;
-	InitCollisionParams(CapsuleParams, ResponseParams);
-
-	const bool bBlocked = GetWorld()->OverlapBlockingTestByChannel(
-		StandingLocation,
-		GetWorldToGravityTransform(),
-		UpdatedComponent->GetCollisionObjectType(),
-		StandingCapsuleShape,
-		CapsuleParams,
-		ResponseParams
-	);
-
-	return !bBlocked;
-}
-
 void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 #if !UE_BUILD_SHIPPING
-	if (CVarMPDebugMovement.GetValueOnGameThread() == 0 || !GEngine)
+	if (!IsDebugEnabled() || !GEngine)
 	{
 		return;
 	}
@@ -198,128 +154,6 @@ void UMPCharacterMovementComponent::PhysCustom(float deltaTime, int32 Iterations
 	}
 }
 
-void UMPCharacterMovementComponent::PhysSlide(float deltaTime, int32 Iterations)
-{
-	float RemainingTime = deltaTime;
-
-	while (RemainingTime >= MIN_TICK_TIME && Iterations < MaxSimulationIterations)
-	{
-		Iterations++;
-		const float TimeTick = GetSimulationTimeStep(RemainingTime, Iterations);
-		RemainingTime -= TimeTick;
-
-		// The slide lasts exactly as long as the slide montage; its root motion sets Velocity before we get here
-		if (!CharacterOwner || !CharacterOwner->IsPlayingRootMotion())
-		{
-			SetMovementMode(MOVE_Walking);
-			StartNewPhysics(RemainingTime, Iterations);
-
-			return;
-		}
-
-		// Keep the animation's speed, but make it follow the floor so slides go up and down ramps
-		FVector Direction = Velocity.GetSafeNormal();
-
-		if (CurrentFloor.IsWalkableFloor())
-		{
-			Direction = FVector::VectorPlaneProject(Direction, CurrentFloor.HitResult.ImpactNormal).GetSafeNormal();
-		}
-
-		Velocity = Direction * Velocity.Size();
-	
-		const FVector Delta = Velocity * TimeTick;
-		const FQuat Rotation = UpdatedComponent->GetComponentQuat();
-		FHitResult Hit;
-	
-		SafeMoveUpdatedComponent(Delta, Rotation, true, Hit);
-	
-		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
-	
-		if (CurrentFloor.IsWalkableFloor())
-		{
-			AdjustFloorHeight();
-		}
-		else
-		{
-			SetMovementMode(MOVE_Falling);
-			StartNewPhysics(RemainingTime, Iterations);
-			
-			return;
-		}
-	}
-}
-
-void UMPCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iterations)
-{
-	float RemainingTime = deltaTime;
-	
-	while (RemainingTime >= MIN_TICK_TIME && Iterations < MaxSimulationIterations)
-	{
-		Iterations++;
-		const float TimeTick = GetSimulationTimeStep(RemainingTime, Iterations);
-		
-		const float TraceLength = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius() + WallRunTraceDistance;
-		const FVector Start = UpdatedComponent->GetComponentLocation();
-		const FVector End = Start - WallRunNormal * TraceLength;
-		
-		FCollisionQueryParams CollisionParams(SCENE_QUERY_STAT(PhysWallRun), false, CharacterOwner);
-		FHitResult WallHit;
-		
-		if (!GetWorld()->LineTraceSingleByChannel(WallHit, Start, End, ECC_WallRun, CollisionParams))
-		{
-			SetMovementMode(MOVE_Falling);
-			StartNewPhysics(RemainingTime, Iterations);
-			
-			return;
-		}
-		
-		const bool bIsTimerExpired = GetWorld()->GetTimeSeconds() - WallRunStartTime >= WallRunMaxDuration;
-		const bool bIsTooSlow = Velocity.Size2D() < WallRunMinSpeed;
-		const bool bIsSteeringAway = FVector::DotProduct(Acceleration.GetSafeNormal2D(), WallRunNormal) > WallRunSteerAwayThreshold;
-
-		if (bIsTimerExpired || bIsTooSlow || bIsSteeringAway)
-		{
-			SetMovementMode(MOVE_Falling);
-			StartNewPhysics(RemainingTime, Iterations);
-			
-			return;
-		}
-		
-		RemainingTime -= TimeTick;
-		
-		WallRunNormal = WallHit.ImpactNormal.GetSafeNormal2D();
-		
-		const FVector HVelocity(Velocity.X, Velocity.Y, 0.f);
-		const FVector AlongWall = FVector::VectorPlaneProject(HVelocity, WallRunNormal).GetSafeNormal();
-		const float RunAlpha = FMath::Clamp((GetWorld()->GetTimeSeconds() - WallRunStartTime) / WallRunMaxDuration, 0.f, 1.f);
-		const float WallRunGravityScale = FMath::Lerp(WallRunGravityScaleStart, WallRunGravityScaleEnd, FMath::Pow(RunAlpha, WallRunGravityCurveExponent));
-		const float NewVelocityZ = Velocity.Z + GetGravityZ() * WallRunGravityScale * TimeTick;
-		
-		Velocity = AlongWall * HVelocity.Size();
-		Velocity.Z = NewVelocityZ;
-		
-		const FVector Delta = (Velocity - WallRunNormal * WallRunStickSpeed) * TimeTick;
-		
-		FHitResult MoveHit;
-		SafeMoveUpdatedComponent(Delta, UpdatedComponent->GetComponentQuat(), true, MoveHit);
-		
-		if (MoveHit.IsValidBlockingHit())
-		{
-			SlideAlongSurface(Delta, 1.f - MoveHit.Time, MoveHit.Normal, MoveHit, true);
-		}
-
-		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
-
-		if (CurrentFloor.IsWalkableFloor() && Velocity.Z <= 0.f)
-		{
-			SetMovementMode(MOVE_Walking);
-			StartNewPhysics(RemainingTime, Iterations);
-
-			return;
-		}
-	}
-}
-
 bool UMPCharacterMovementComponent::IsMovingOnGround() const
 {
 	if (IsCustomMovementMode(EMPCustomMovementMode::Slide))
@@ -384,26 +218,6 @@ bool UMPCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime
 	}
 	
 	return Super::DoJump(bReplayingMoves, DeltaTime);
-}
-
-bool UMPCharacterMovementComponent::IsSliding() const
-{
-	return IsCustomMovementMode(EMPCustomMovementMode::Slide);
-}
-
-bool UMPCharacterMovementComponent::IsWallRunning() const
-{
-	return IsCustomMovementMode(EMPCustomMovementMode::WallRun);
-}
-
-float UMPCharacterMovementComponent::GetWallRunSide() const
-{
-	if (!IsWallRunning() || !CharacterOwner)
-		return 0.f;
-	
-	const float Product = FVector::DotProduct(WallRunNormal, CharacterOwner->GetActorRightVector());
-	
-	return Product > 0.f ? -1.f : 1.f;
 }
 
 FRotator UMPCharacterMovementComponent::ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const
@@ -518,144 +332,5 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 	}
 
 	LogMovementModeTransition(PreviousMovementMode, PreviousCustomMode);
-}
-
-bool UMPCharacterMovementComponent::FindRunnableWall(FHitResult& OutWallHit) const
-{
-	if (!HasValidData())
-		return false;
-
-	FVector HVelocity = Velocity;
-	HVelocity.Z = 0.f;
-
-	if (HVelocity.IsNearlyZero())
-		return false;
-
-	const FVector HDirection = HVelocity.GetSafeNormal();
-	const FVector PDirection = FVector::CrossProduct(FVector::UpVector, HDirection).GetSafeNormal();
-
-	const UCapsuleComponent* Capsule = CharacterOwner->GetCapsuleComponent();
-	const float CapsuleRadius = Capsule->GetScaledCapsuleRadius();
-	const float CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
-
-	const float TraceLength = CapsuleRadius + WallRunTraceDistance;
-
-	FCollisionQueryParams CollisionParams(SCENE_QUERY_STAT(FindRunnableWall), false, CharacterOwner);
-
-	const FVector Start = UpdatedComponent->GetComponentLocation();
-	const FVector EndA = Start + PDirection * TraceLength;
-	const FVector EndB = Start - PDirection * TraceLength;
-	
-	FHitResult HitA, HitB;
-	
-	const bool bHitA = GetWorld()->LineTraceSingleByChannel(HitA, Start, EndA, ECC_WallRun, CollisionParams);
-	const bool bHitB = GetWorld()->LineTraceSingleByChannel(HitB, Start, EndB, ECC_WallRun, CollisionParams);
-
-	const FVector DownStart = Start - FVector(0.f, 0.f, CapsuleHalfHeight);
-	const FVector DownEnd = DownStart - FVector(0.f, 0.f, WallRunMinHeight);
-
-	FHitResult FloorHit;
-	const bool bFloorHit = GetWorld()->LineTraceSingleByChannel(FloorHit, DownStart, DownEnd,
-		UpdatedComponent->GetCollisionObjectType(), CollisionParams);
-
-	const bool bUseA = bHitA && (!bHitB || HitA.Distance <= HitB.Distance);
-	const FHitResult& WallHit = bUseA ? HitA : HitB;
-
-	bool bRunnable = (bHitA || bHitB) && WallHit.GetComponent() != LastWall.Get();
-
-	if (bRunnable)
-	{
-		const float MaxNormalZ = FMath::Sin(FMath::DegreesToRadians(WallRunMaxSurfaceTilt));
-		const FVector AlongWallVelocity = FVector::VectorPlaneProject(HVelocity, WallHit.ImpactNormal);
-
-		bRunnable = FMath::Abs(WallHit.ImpactNormal.Z) <= MaxNormalZ
-			&& AlongWallVelocity.Size() >= WallRunMinSpeed
-			&& !bFloorHit;
-	}
-
-#if !UE_BUILD_SHIPPING
-	if (CVarMPDebugMovement.GetValueOnGameThread() != 0)
-	{
-		auto SideColor = [bRunnable](bool bHit, bool bChosen)
-		{
-			if (!bHit)
-				return FColor::Silver;
-
-			return (bRunnable && bChosen) ? FColor::Green : FColor::Red;
-		};
-
-		DrawDebugLine(GetWorld(), Start, bHitA ? HitA.ImpactPoint : EndA, SideColor(bHitA, bUseA), false, -1.f, 0, 1.5f);
-		DrawDebugLine(GetWorld(), Start, bHitB ? HitB.ImpactPoint : EndB, SideColor(bHitB, !bUseA), false, -1.f, 0, 1.5f);
-		DrawDebugLine(GetWorld(), DownStart, bFloorHit ? FloorHit.ImpactPoint : DownEnd,
-			bFloorHit ? FColor::Red : FColor::Green, false, -1.f, 0, 1.5f);
-	}
-#endif
-
-	if (bRunnable)
-	{
-		OutWallHit = WallHit;
-	}
-
-	return bRunnable;
-}
-
-bool UMPCharacterMovementComponent::FindKickableWall(FHitResult& OutKickHit) const
-{
-	if (!HasValidData() || MovementMode != MOVE_Falling)
-		return false;
-	
-	const FVector Forward = CharacterOwner->GetActorForwardVector().GetSafeNormal2D();
-	
-	if (Forward.IsNearlyZero())
-		return false;
-	
-	const float CapsuleRadius = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius();
-	const float TraceLength = CapsuleRadius + WallKickTraceDistance;
-	
-	FCollisionQueryParams CollisionParams(SCENE_QUERY_STAT(FindKickableWall), false, CharacterOwner);
-	
-	const FVector Start = UpdatedComponent->GetComponentLocation();
-	const FVector End = Start + Forward * TraceLength;
-	
-	FHitResult KickHit;
-	const bool bHit = GetWorld()->SweepSingleByChannel(KickHit, Start, End, FQuat::Identity, ECC_WallRun,
-		FCollisionShape::MakeSphere(WallKickTraceRadius), CollisionParams);
-	
-	bool bKickable = bHit && KickHit.GetComponent() != LastWall.Get();
-	
-	if (bKickable)
-	{
-		const float MaxNormalZ = FMath::Sin(FMath::DegreesToRadians(WallRunMaxSurfaceTilt));
-		const float FacingDot = FVector::DotProduct(Forward, -KickHit.ImpactNormal.GetSafeNormal2D());
-		const float MinFacingDot = FMath::Cos(FMath::DegreesToRadians(WallKickMaxAngle));
-		
-		bKickable = FMath::Abs(KickHit.ImpactNormal.Z) <= MaxNormalZ
-			&& FacingDot >= MinFacingDot;
-	}
-	
-#if !UE_BUILD_SHIPPING
-	if (CVarMPDebugMovement.GetValueOnGameThread() != 0)
-	{
-		const FColor Color = !bHit ? FColor::Silver : (bKickable ? FColor::Green : FColor::Red);
-		const FVector SphereCenter = bHit ? KickHit.Location : End;
-		
-		DrawDebugLine(GetWorld(), Start, SphereCenter, Color, false, -1.f, 0, 1.5f);
-		DrawDebugSphere(GetWorld(), SphereCenter, WallKickTraceRadius, 12, Color, false, -1.f, 0, 1.f);
-	}
-#endif
-	
-	if (bKickable)
-	{
-		OutKickHit = KickHit;
-	}
-	
-	return bKickable;
-}
-
-bool UMPCharacterMovementComponent::CanWallKick() const
-{
-	FHitResult Hit;
-	
-	return FindKickableWall(Hit);
 }
 

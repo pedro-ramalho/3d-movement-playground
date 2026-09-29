@@ -1,7 +1,7 @@
-﻿#include "GameFramework/Character.h"
-
-#include "MP/MPCharacterMovementComponent.h"
+﻿#include "MP/MPCharacterMovementComponent.h"
 #include "MP/MPMovementTypes.h"
+
+#include "GameFramework/Character.h"
 
 void UMPCharacterMovementComponent::RequestGrapple(const FVector& Anchor, const AActor* AnchorActor)
 {

@@ -138,6 +138,7 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	void EvalCurrentCustomMovementMode(const EMPCustomMovementMode Mode);
 	
 	void LogMovementModeTransition(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) const;
+	
 public:
 	UMPCharacterMovementComponent();
 	

@@ -1,3 +1,6 @@
+#include "GameFramework/Character.h"
+#include "Components/CapsuleComponent.h"
+
 #include "MP/MPCharacterMovementComponent.h"
 #include "MP/MPMovementTypes.h"
 
@@ -22,4 +25,103 @@ void UMPCharacterMovementComponent::OnExitSlide()
 {
 	bWantsToCrouch = false;
 	bWantsToSlide = false;
+}
+
+void UMPCharacterMovementComponent::SetWantsToSlide(bool bWants)
+{
+	bWantsToSlide = bWants;
+}
+
+bool UMPCharacterMovementComponent::CanStandUp() const
+{
+	if (!HasValidData())
+	{
+		return false;
+	}
+
+	// Same test as UCharacterMovementComponent::UnCrouch, for the bCrouchMaintainsBaseLocation case
+	const UCapsuleComponent* Capsule = CharacterOwner->GetCapsuleComponent();
+	const ACharacter* DefaultCharacter = CharacterOwner->GetClass()->GetDefaultObject<ACharacter>();
+
+	const float HalfHeightAdjust = DefaultCharacter->GetCapsuleComponent()->GetUnscaledCapsuleHalfHeight() - Capsule->GetUnscaledCapsuleHalfHeight();
+	const float ScaledHalfHeightAdjust = HalfHeightAdjust * Capsule->GetShapeScale();
+
+	// Slightly taller than standing, so a ceiling at exactly standing height still blocks
+	const float SweepInflation = UE_KINDA_SMALL_NUMBER * 10.f;
+	const FCollisionShape StandingCapsuleShape = GetPawnCapsuleCollisionShape(SHRINK_HeightCustom, -SweepInflation - ScaledHalfHeightAdjust);
+
+	// The feet stay put, so the standing capsule's center sits higher than the current one
+	const FVector StandingLocation = UpdatedComponent->GetComponentLocation()
+		+ (StandingCapsuleShape.GetCapsuleHalfHeight() - Capsule->GetScaledCapsuleHalfHeight()) * -GetGravityDirection();
+
+	FCollisionQueryParams CapsuleParams(SCENE_QUERY_STAT(MPStandUpTest), false, CharacterOwner);
+	FCollisionResponseParams ResponseParams;
+	InitCollisionParams(CapsuleParams, ResponseParams);
+
+	const bool bBlocked = GetWorld()->OverlapBlockingTestByChannel(
+		StandingLocation,
+		GetWorldToGravityTransform(),
+		UpdatedComponent->GetCollisionObjectType(),
+		StandingCapsuleShape,
+		CapsuleParams,
+		ResponseParams
+	);
+
+	return !bBlocked;
+}
+
+void UMPCharacterMovementComponent::PhysSlide(float deltaTime, int32 Iterations)
+{
+	float RemainingTime = deltaTime;
+
+	while (RemainingTime >= MIN_TICK_TIME && Iterations < MaxSimulationIterations)
+	{
+		Iterations++;
+		const float TimeTick = GetSimulationTimeStep(RemainingTime, Iterations);
+		RemainingTime -= TimeTick;
+
+		// The slide lasts exactly as long as the slide montage; its root motion sets Velocity before we get here
+		if (!CharacterOwner || !CharacterOwner->IsPlayingRootMotion())
+		{
+			SetMovementMode(MOVE_Walking);
+			StartNewPhysics(RemainingTime, Iterations);
+
+			return;
+		}
+
+		// Keep the animation's speed, but make it follow the floor so slides go up and down ramps
+		FVector Direction = Velocity.GetSafeNormal();
+
+		if (CurrentFloor.IsWalkableFloor())
+		{
+			Direction = FVector::VectorPlaneProject(Direction, CurrentFloor.HitResult.ImpactNormal).GetSafeNormal();
+		}
+
+		Velocity = Direction * Velocity.Size();
+	
+		const FVector Delta = Velocity * TimeTick;
+		const FQuat Rotation = UpdatedComponent->GetComponentQuat();
+		FHitResult Hit;
+	
+		SafeMoveUpdatedComponent(Delta, Rotation, true, Hit);
+	
+		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
+	
+		if (CurrentFloor.IsWalkableFloor())
+		{
+			AdjustFloorHeight();
+		}
+		else
+		{
+			SetMovementMode(MOVE_Falling);
+			StartNewPhysics(RemainingTime, Iterations);
+			
+			return;
+		}
+	}
+}
+
+bool UMPCharacterMovementComponent::IsSliding() const
+{
+	return IsCustomMovementMode(EMPCustomMovementMode::Slide);
 }
