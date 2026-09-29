@@ -152,10 +152,6 @@ public:
 	
 	virtual bool DoJump(bool bReplayingMoves, float DeltaTime) override;
 	
-	void PerformWallJump();
-	
-	void PerformWallKick(const FHitResult& KickHit);
-	
 	bool IsCustomMovementMode(EMPCustomMovementMode Mode) const;
 	
 	UFUNCTION(BlueprintPure, Category = "MP|Movement")
@@ -226,7 +222,15 @@ protected:
 	void OnEnterWallRun();
 	
 	void OnExitWallRun();
-	
+
+	[[nodiscard]] TOptional<FHitResult> TraceCurrentWall() const;
+
+	[[nodiscard]] bool ShouldLeaveWallRun() const;
+
+	[[nodiscard]] float GetWallRunGravityScale() const;
+
+	void UpdateWallRunVelocity(float TimeTick);
+
 	// Grapple Mechanic
 	void PhysGrapple(float deltaTime, int32 Iterations);
 
@@ -249,4 +253,8 @@ protected:
 	void ApplyRopeToVelocity();
 	
 	void ApplyRopeToPosition();
+	
+	void PerformWallJump();
+	
+	void PerformWallKick(const FHitResult& KickHit);
 };

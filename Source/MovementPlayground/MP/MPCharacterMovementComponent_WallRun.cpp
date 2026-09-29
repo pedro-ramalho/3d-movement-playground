@@ -43,43 +43,20 @@ void UMPCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iteration
 	{
 		Iterations++;
 		const float TimeTick = GetSimulationTimeStep(RemainingTime, Iterations);
-		
-		const float TraceLength = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius() + WallRunTraceDistance;
-		const FVector Start = UpdatedComponent->GetComponentLocation();
-		const FVector End = Start - WallRunNormal * TraceLength;
-		
-		FCollisionQueryParams CollisionParams(SCENE_QUERY_STAT(PhysWallRun), false, CharacterOwner);
-		FHitResult WallHit;
-		
-		if (!GetWorld()->LineTraceSingleByChannel(WallHit, Start, End, ECC_WallRun, CollisionParams))
-		{
-			ExitPhysicsTo(MOVE_Falling, RemainingTime, Iterations);
-			return;
-		}
-		
-		const bool bIsTimerExpired = GetWorld()->GetTimeSeconds() - WallRunStartTime >= WallRunMaxDuration;
-		const bool bIsTooSlow = Velocity.Size2D() < WallRunMinSpeed;
-		const bool bIsSteeringAway = FVector::DotProduct(Acceleration.GetSafeNormal2D(), WallRunNormal) > WallRunSteerAwayThreshold;
 
-		if (bIsTimerExpired || bIsTooSlow || bIsSteeringAway)
+		const TOptional<FHitResult> WallHit = TraceCurrentWall();
+
+		if (!WallHit || ShouldLeaveWallRun())
 		{
 			ExitPhysicsTo(MOVE_Falling, RemainingTime, Iterations);
 			return;
 		}
-		
+
 		RemainingTime -= TimeTick;
-		
-		WallRunNormal = WallHit.ImpactNormal.GetSafeNormal2D();
-		
-		const FVector HVelocity(Velocity.X, Velocity.Y, 0.f);
-		const FVector AlongWall = FVector::VectorPlaneProject(HVelocity, WallRunNormal).GetSafeNormal();
-		const float RunAlpha = FMath::Clamp((GetWorld()->GetTimeSeconds() - WallRunStartTime) / WallRunMaxDuration, 0.f, 1.f);
-		const float WallRunGravityScale = FMath::Lerp(WallRunGravityScaleStart, WallRunGravityScaleEnd, FMath::Pow(RunAlpha, WallRunGravityCurveExponent));
-		const float NewVelocityZ = Velocity.Z + GetGravityZ() * WallRunGravityScale * TimeTick;
-		
-		Velocity = AlongWall * HVelocity.Size();
-		Velocity.Z = NewVelocityZ;
-		
+
+		WallRunNormal = WallHit->ImpactNormal.GetSafeNormal2D();
+		UpdateWallRunVelocity(TimeTick);
+
 		const FVector Delta = (Velocity - WallRunNormal * WallRunStickSpeed) * TimeTick;
 		MoveAndSlide(Delta, TimeTick);
 
@@ -91,6 +68,49 @@ void UMPCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iteration
 			return;
 		}
 	}
+}
+
+TOptional<FHitResult> UMPCharacterMovementComponent::TraceCurrentWall() const
+{
+	const float TraceLength = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius() + WallRunTraceDistance;
+	const FVector Start = UpdatedComponent->GetComponentLocation();
+	const FVector End = Start - WallRunNormal * TraceLength;
+
+	FCollisionQueryParams CollisionParams(SCENE_QUERY_STAT(TraceCurrentWall), false, CharacterOwner);
+	FHitResult WallHit;
+
+	if (!GetWorld()->LineTraceSingleByChannel(WallHit, Start, End, ECC_WallRun, CollisionParams))
+	{
+		return {};
+	}
+
+	return WallHit;
+}
+
+bool UMPCharacterMovementComponent::ShouldLeaveWallRun() const
+{
+	const bool bIsTimerExpired = GetWorld()->GetTimeSeconds() - WallRunStartTime >= WallRunMaxDuration;
+	const bool bIsTooSlow = Velocity.Size2D() < WallRunMinSpeed;
+	const bool bIsSteeringAway = FVector::DotProduct(Acceleration.GetSafeNormal2D(), WallRunNormal) > WallRunSteerAwayThreshold;
+
+	return bIsTimerExpired || bIsTooSlow || bIsSteeringAway;
+}
+
+float UMPCharacterMovementComponent::GetWallRunGravityScale() const
+{
+	const float RunAlpha = FMath::Clamp((GetWorld()->GetTimeSeconds() - WallRunStartTime) / WallRunMaxDuration, 0.f, 1.f);
+
+	return FMath::Lerp(WallRunGravityScaleStart, WallRunGravityScaleEnd, FMath::Pow(RunAlpha, WallRunGravityCurveExponent));
+}
+
+void UMPCharacterMovementComponent::UpdateWallRunVelocity(float TimeTick)
+{
+	const FVector HVelocity(Velocity.X, Velocity.Y, 0.f);
+	const FVector AlongWall = FVector::VectorPlaneProject(HVelocity, WallRunNormal).GetSafeNormal();
+	const float NewVelocityZ = Velocity.Z + GetGravityZ() * GetWallRunGravityScale() * TimeTick;
+
+	Velocity = AlongWall * HVelocity.Size();
+	Velocity.Z = NewVelocityZ;
 }
 
 bool UMPCharacterMovementComponent::IsWallSurface(const FVector& Normal) const
