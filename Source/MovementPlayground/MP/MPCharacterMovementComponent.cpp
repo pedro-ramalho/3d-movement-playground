@@ -15,12 +15,62 @@ static TAutoConsoleVariable<int32> CVarMPDebugMovement(
 	ECVF_Cheat
 );
 
+#if !UE_BUILD_SHIPPING
+namespace
+{
+	const TCHAR* YesNo(bool bValue)
+	{
+		return bValue ? TEXT("yes") : TEXT("no");
+	}
+}
+#endif
+
 bool UMPCharacterMovementComponent::IsDebugEnabled()
 {
 #if !UE_BUILD_SHIPPING
 	return CVarMPDebugMovement.GetValueOnGameThread() != 0;
 #else
 	return false;
+#endif
+}
+
+void UMPCharacterMovementComponent::PrintDebugMessage(EMPDebugKey Key, const FString& Message)
+{
+#if !UE_BUILD_SHIPPING
+	if (GEngine)
+	{
+		GEngine->AddOnScreenDebugMessage(static_cast<int32>(Key), 0.f, FColor::Cyan, Message);
+	}
+#endif
+}
+
+FColor UMPCharacterMovementComponent::GetDebugTraceColor(bool bHit, bool bAccepted)
+{
+	if (!bHit)
+	{
+		return FColor::Silver;
+	}
+
+	return bAccepted ? FColor::Green : FColor::Red;
+}
+
+void UMPCharacterMovementComponent::DrawDebugTraceLine(const FVector& Start, const FVector& End, const FColor& Color) const
+{
+#if !UE_BUILD_SHIPPING
+	if (IsDebugEnabled())
+	{
+		DrawDebugLine(GetWorld(), Start, End, Color, false, -1.f, 0, 1.5f);
+	}
+#endif
+}
+
+void UMPCharacterMovementComponent::DrawDebugTraceSphere(const FVector& Center, float Radius, const FColor& Color) const
+{
+#if !UE_BUILD_SHIPPING
+	if (IsDebugEnabled())
+	{
+		DrawDebugSphere(GetWorld(), Center, Radius, 12, Color, false, -1.f, 0, 1.f);
+	}
 #endif
 }
 
@@ -51,9 +101,8 @@ void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float Del
 	TryEnterGrapple();
 	TryEnterSlide();
 	TryEnterWallRun();
-	
-	FHitResult KickHit;
-	bHasKickCandidate = MovementMode == MOVE_Falling && FindKickableWall(KickHit);
+
+	bHasKickCandidate = FindKickableWall().IsSet();
 
 	Super::UpdateCharacterStateBeforeMovement(DeltaSeconds);
 }
@@ -63,73 +112,27 @@ void UMPCharacterMovementComponent::TickComponent(float DeltaTime, enum ELevelTi
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
 #if !UE_BUILD_SHIPPING
-	if (!IsDebugEnabled() || !GEngine)
+	if (!IsDebugEnabled())
 	{
 		return;
 	}
 
-	constexpr int32 ModeKey = 1;
-	constexpr int32 SpeedKey = 2;
-	constexpr int32 SlideKey = 3;
-	constexpr int32 CrouchKey = 4;
-	constexpr int32 WallRunKey = 5;
-	constexpr int32 WallKickKey = 6;
-	constexpr int32 GrappleKey = 8;
+	PrintDebugMessage(EMPDebugKey::Mode, FString::Printf(TEXT("Current mode: %s"), *MovementModeToString(MovementMode, CustomMovementMode)));
+	PrintDebugMessage(EMPDebugKey::Speed, FString::Printf(TEXT("Horizontal speed: %.0f cm/s"), Velocity.Size2D()));
+	PrintDebugMessage(EMPDebugKey::Slide, FString::Printf(TEXT("Wants to slide: %s"), YesNo(bWantsToSlide)));
+	PrintDebugMessage(EMPDebugKey::Crouch, FString::Printf(TEXT("Crouched: %s"), YesNo(IsCrouching())));
+	PrintDebugMessage(EMPDebugKey::WallRun, FString::Printf(TEXT("Wall candidate: %s"), YesNo(bHasWallCandidate)));
+	PrintDebugMessage(EMPDebugKey::WallKick, FString::Printf(TEXT("Wall kick: %s"), YesNo(bHasKickCandidate)));
 
-	GEngine->AddOnScreenDebugMessage(
-		ModeKey,
-		0.f,
-		FColor::Cyan,
-		FString::Printf(TEXT("Current mode: %s"), *MovementModeToString(MovementMode, CustomMovementMode))
-	);
-
-	GEngine->AddOnScreenDebugMessage(
-		SpeedKey,
-		0.f,
-		FColor::Cyan,
-		FString::Printf(TEXT("Horizontal speed: %.0f cm/s"), Velocity.Size2D())
-	);
-	
-	GEngine->AddOnScreenDebugMessage(
-		SlideKey,
-		0.f,
-		FColor::Cyan,
-		FString::Printf(TEXT("Wants to slide: %s"), bWantsToSlide ? TEXT("yes") : TEXT("no"))
-	);
-	
-	GEngine->AddOnScreenDebugMessage(
-		CrouchKey,
-		0.f,
-		FColor::Cyan,
-		FString::Printf(TEXT("Crouched: %s"), IsCrouching() ? TEXT("yes") : TEXT("no"))
-	);
-	
-	GEngine->AddOnScreenDebugMessage(
-		WallRunKey,
-		0.f,
-		FColor::Cyan,
-		FString::Printf(TEXT("Wall candidate: %s"), bHasWallCandidate ? TEXT("yes") : TEXT("no"))
-	);
-
-	GEngine->AddOnScreenDebugMessage(
-		WallKickKey,
-		0.f,
-		FColor::Cyan,
-		FString::Printf(TEXT("Wall kick: %s"), bHasKickCandidate ? TEXT("yes") : TEXT("no"))
-	);
-	
-	GEngine->AddOnScreenDebugMessage(
-		GrappleKey,
-		0.f,
-		FColor::Cyan,
-		IsGrappling()
-			? FString::Printf(TEXT("Rope: %.0f / %.0f cm"), RopeLength, TargetRopeLength)
-			: FString(TEXT("Rope: -"))
-	);
-	
 	if (IsGrappling())
+	{
+		PrintDebugMessage(EMPDebugKey::Rope, FString::Printf(TEXT("Rope: %.0f / %.0f cm"), RopeLength, TargetRopeLength));
 		DrawDebugLine(GetWorld(), UpdatedComponent->GetComponentLocation(), GrappleAnchor, FColor::Green, false, -1.f, 0, 2.f);
-
+	}
+	else
+	{
+		PrintDebugMessage(EMPDebugKey::Rope, TEXT("Rope: -"));
+	}
 #endif
 }
 
@@ -193,10 +196,9 @@ bool UMPCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime
 		return true;
 	}
 	
-	FHitResult KickHit;
-	if (FindKickableWall(KickHit))
+	if (const TOptional<FHitResult> KickHit = FindKickableWall())
 	{
-		PerformWallKick(KickHit);
+		PerformWallKick(*KickHit);
 		return true;
 	}
 	

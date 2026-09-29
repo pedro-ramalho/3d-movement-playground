@@ -1,19 +1,18 @@
 #include "GameFramework/Character.h"
 #include "Components/CapsuleComponent.h"
-#include "DrawDebugHelpers.h"
 
 #include "MP/MPCharacterMovementComponent.h"
 #include "MP/MPMovementTypes.h"
 
 void UMPCharacterMovementComponent::TryEnterWallRun()
 {
-	FHitResult WallHit;
-	bHasWallCandidate = MovementMode == MOVE_Falling && FindRunnableWall(WallHit);
+	const TOptional<FHitResult> WallHit = FindRunnableWall();
+	bHasWallCandidate = WallHit.IsSet();
 
-	if (bHasWallCandidate)
+	if (WallHit)
 	{
-		WallRunNormal = WallHit.ImpactNormal.GetSafeNormal2D();
-		CurrentWall = WallHit.GetComponent();
+		WallRunNormal = WallHit->ImpactNormal.GetSafeNormal2D();
+		CurrentWall = WallHit->GetComponent();
 		SetMovementMode(MOVE_Custom, static_cast<uint8>(EMPCustomMovementMode::WallRun));
 	}
 }
@@ -70,13 +69,14 @@ void UMPCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iteration
 	}
 }
 
-TOptional<FHitResult> UMPCharacterMovementComponent::TraceCurrentWall() const
+float UMPCharacterMovementComponent::GetWallRunTraceLength() const
 {
-	const float TraceLength = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius() + WallRunTraceDistance;
-	const FVector Start = UpdatedComponent->GetComponentLocation();
-	const FVector End = Start - WallRunNormal * TraceLength;
+	return CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius() + WallRunTraceDistance;
+}
 
-	FCollisionQueryParams CollisionParams(SCENE_QUERY_STAT(TraceCurrentWall), false, CharacterOwner);
+TOptional<FHitResult> UMPCharacterMovementComponent::TraceWall(const FVector& Start, const FVector& End) const
+{
+	FCollisionQueryParams CollisionParams(SCENE_QUERY_STAT(TraceWall), false, CharacterOwner);
 	FHitResult WallHit;
 
 	if (!GetWorld()->LineTraceSingleByChannel(WallHit, Start, End, ECC_WallRun, CollisionParams))
@@ -85,6 +85,30 @@ TOptional<FHitResult> UMPCharacterMovementComponent::TraceCurrentWall() const
 	}
 
 	return WallHit;
+}
+
+TOptional<FHitResult> UMPCharacterMovementComponent::TraceCurrentWall() const
+{
+	const FVector Start = UpdatedComponent->GetComponentLocation();
+
+	return TraceWall(Start, Start - WallRunNormal * GetWallRunTraceLength());
+}
+
+bool UMPCharacterMovementComponent::IsTooLowForWallRun() const
+{
+	const float CapsuleHalfHeight = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleHalfHeight();
+	const FVector Start = UpdatedComponent->GetComponentLocation() - FVector(0.f, 0.f, CapsuleHalfHeight);
+	const FVector End = Start - FVector(0.f, 0.f, WallRunMinHeight);
+
+	FCollisionQueryParams CollisionParams(SCENE_QUERY_STAT(IsTooLowForWallRun), false, CharacterOwner);
+	FHitResult FloorHit;
+
+	const bool bFloorHit = GetWorld()->LineTraceSingleByChannel(FloorHit, Start, End,
+		UpdatedComponent->GetCollisionObjectType(), CollisionParams);
+
+	DrawDebugTraceLine(Start, bFloorHit ? FloorHit.ImpactPoint : End, bFloorHit ? FColor::Red : FColor::Green);
+
+	return bFloorHit;
 }
 
 bool UMPCharacterMovementComponent::ShouldLeaveWallRun() const
@@ -120,94 +144,65 @@ bool UMPCharacterMovementComponent::IsWallSurface(const FVector& Normal) const
 	return FMath::Abs(Normal.Z) <= MaxNormalZ;
 }
 
-bool UMPCharacterMovementComponent::FindRunnableWall(FHitResult& OutWallHit) const
-{
-	if (!HasValidData())
-		return false;
-
-	FVector HVelocity = Velocity;
-	HVelocity.Z = 0.f;
-
-	if (HVelocity.IsNearlyZero())
-		return false;
-
-	const FVector HDirection = HVelocity.GetSafeNormal();
-	const FVector PDirection = FVector::CrossProduct(FVector::UpVector, HDirection).GetSafeNormal();
-
-	const UCapsuleComponent* Capsule = CharacterOwner->GetCapsuleComponent();
-	const float CapsuleRadius = Capsule->GetScaledCapsuleRadius();
-	const float CapsuleHalfHeight = Capsule->GetScaledCapsuleHalfHeight();
-
-	const float TraceLength = CapsuleRadius + WallRunTraceDistance;
-
-	FCollisionQueryParams CollisionParams(SCENE_QUERY_STAT(FindRunnableWall), false, CharacterOwner);
-
-	const FVector Start = UpdatedComponent->GetComponentLocation();
-	const FVector EndA = Start + PDirection * TraceLength;
-	const FVector EndB = Start - PDirection * TraceLength;
-	
-	FHitResult HitA, HitB;
-	
-	const bool bHitA = GetWorld()->LineTraceSingleByChannel(HitA, Start, EndA, ECC_WallRun, CollisionParams);
-	const bool bHitB = GetWorld()->LineTraceSingleByChannel(HitB, Start, EndB, ECC_WallRun, CollisionParams);
-
-	const FVector DownStart = Start - FVector(0.f, 0.f, CapsuleHalfHeight);
-	const FVector DownEnd = DownStart - FVector(0.f, 0.f, WallRunMinHeight);
-
-	FHitResult FloorHit;
-	const bool bFloorHit = GetWorld()->LineTraceSingleByChannel(FloorHit, DownStart, DownEnd,
-		UpdatedComponent->GetCollisionObjectType(), CollisionParams);
-
-	const bool bUseA = bHitA && (!bHitB || HitA.Distance <= HitB.Distance);
-	const FHitResult& WallHit = bUseA ? HitA : HitB;
-
-	bool bRunnable = (bHitA || bHitB) && WallHit.GetComponent() != LastWall.Get();
-
-	if (bRunnable)
-	{
-		const FVector AlongWallVelocity = FVector::VectorPlaneProject(HVelocity, WallHit.ImpactNormal);
-
-		bRunnable = IsWallSurface(WallHit.ImpactNormal)
-			&& AlongWallVelocity.Size() >= WallRunMinSpeed
-			&& !bFloorHit;
-	}
-
-#if !UE_BUILD_SHIPPING
-	if (IsDebugEnabled())
-	{
-		auto SideColor = [bRunnable](bool bHit, bool bChosen)
-		{
-			if (!bHit)
-				return FColor::Silver;
-
-			return (bRunnable && bChosen) ? FColor::Green : FColor::Red;
-		};
-
-		DrawDebugLine(GetWorld(), Start, bHitA ? HitA.ImpactPoint : EndA, SideColor(bHitA, bUseA), false, -1.f, 0, 1.5f);
-		DrawDebugLine(GetWorld(), Start, bHitB ? HitB.ImpactPoint : EndB, SideColor(bHitB, !bUseA), false, -1.f, 0, 1.5f);
-		DrawDebugLine(GetWorld(), DownStart, bFloorHit ? FloorHit.ImpactPoint : DownEnd,
-			bFloorHit ? FColor::Red : FColor::Green, false, -1.f, 0, 1.5f);
-	}
-#endif
-
-	if (bRunnable)
-	{
-		OutWallHit = WallHit;
-	}
-
-	return bRunnable;
-}
-
-bool UMPCharacterMovementComponent::FindKickableWall(FHitResult& OutKickHit) const
+TOptional<FHitResult> UMPCharacterMovementComponent::FindRunnableWall() const
 {
 	if (!HasValidData() || MovementMode != MOVE_Falling)
-		return false;
-	
+	{
+		return {};
+	}
+
+	const FVector HVelocity(Velocity.X, Velocity.Y, 0.f);
+
+	if (HVelocity.IsNearlyZero())
+	{
+		return {};
+	}
+
+	const FVector Side = FVector::CrossProduct(FVector::UpVector, HVelocity.GetSafeNormal()).GetSafeNormal();
+	const float TraceLength = GetWallRunTraceLength();
+
+	const FVector Start = UpdatedComponent->GetComponentLocation();
+	const FVector EndA = Start + Side * TraceLength;
+	const FVector EndB = Start - Side * TraceLength;
+
+	const TOptional<FHitResult> HitA = TraceWall(Start, EndA);
+	const TOptional<FHitResult> HitB = TraceWall(Start, EndB);
+	const bool bTooLow = IsTooLowForWallRun();
+
+	const bool bUseA = HitA && (!HitB || HitA->Distance <= HitB->Distance);
+	const TOptional<FHitResult>& WallHit = bUseA ? HitA : HitB;
+
+	const bool bRunnable = WallHit
+		&& WallHit->GetComponent() != LastWall.Get()
+		&& IsWallSurface(WallHit->ImpactNormal)
+		&& FVector::VectorPlaneProject(HVelocity, WallHit->ImpactNormal).Size() >= WallRunMinSpeed
+		&& !bTooLow;
+
+	DrawDebugTraceLine(Start, HitA ? HitA->ImpactPoint : EndA, GetDebugTraceColor(HitA.IsSet(), bRunnable && bUseA));
+	DrawDebugTraceLine(Start, HitB ? HitB->ImpactPoint : EndB, GetDebugTraceColor(HitB.IsSet(), bRunnable && !bUseA));
+
+	if (!bRunnable)
+	{
+		return {};
+	}
+
+	return WallHit;
+}
+
+TOptional<FHitResult> UMPCharacterMovementComponent::FindKickableWall() const
+{
+	if (!HasValidData() || MovementMode != MOVE_Falling)
+	{
+		return {};
+	}
+
 	const FVector Forward = CharacterOwner->GetActorForwardVector().GetSafeNormal2D();
-	
+
 	if (Forward.IsNearlyZero())
-		return false;
-	
+	{
+		return {};
+	}
+
 	const float CapsuleRadius = CharacterOwner->GetCapsuleComponent()->GetScaledCapsuleRadius();
 	const float TraceLength = CapsuleRadius + WallKickTraceDistance;
 	
@@ -231,30 +226,23 @@ bool UMPCharacterMovementComponent::FindKickableWall(FHitResult& OutKickHit) con
 			&& FacingDot >= MinFacingDot;
 	}
 	
-#if !UE_BUILD_SHIPPING
-	if (IsDebugEnabled())
+	const FColor DebugColor = GetDebugTraceColor(bHit, bKickable);
+	const FVector SphereCenter = bHit ? KickHit.Location : End;
+
+	DrawDebugTraceLine(Start, SphereCenter, DebugColor);
+	DrawDebugTraceSphere(SphereCenter, WallKickTraceRadius, DebugColor);
+
+	if (!bKickable)
 	{
-		const FColor Color = !bHit ? FColor::Silver : (bKickable ? FColor::Green : FColor::Red);
-		const FVector SphereCenter = bHit ? KickHit.Location : End;
-		
-		DrawDebugLine(GetWorld(), Start, SphereCenter, Color, false, -1.f, 0, 1.5f);
-		DrawDebugSphere(GetWorld(), SphereCenter, WallKickTraceRadius, 12, Color, false, -1.f, 0, 1.f);
+		return {};
 	}
-#endif
-	
-	if (bKickable)
-	{
-		OutKickHit = KickHit;
-	}
-	
-	return bKickable;
+
+	return KickHit;
 }
 
 bool UMPCharacterMovementComponent::CanWallKick() const
 {
-	FHitResult Hit;
-	
-	return FindKickableWall(Hit);
+	return FindKickableWall().IsSet();
 }
 
 bool UMPCharacterMovementComponent::IsWallRunning() const

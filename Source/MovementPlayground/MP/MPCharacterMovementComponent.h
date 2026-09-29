@@ -7,6 +7,7 @@
 #include "MPCharacterMovementComponent.generated.h"
 
 enum class EMPCustomMovementMode : uint8;
+enum class EMPDebugKey : int32;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogMPMovement, Log, All);
 
@@ -138,7 +139,13 @@ class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMo
 	void EvalCurrentCustomMovementMode(const EMPCustomMovementMode Mode);
 	
 	void LogMovementModeTransition(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) const;
-	
+
+	[[nodiscard]] static FColor GetDebugTraceColor(bool bHit, bool bAccepted);
+
+	void DrawDebugTraceLine(const FVector& Start, const FVector& End, const FColor& Color) const;
+
+	void DrawDebugTraceSphere(const FVector& Center, float Radius, const FColor& Color) const;
+
 public:
 	UMPCharacterMovementComponent();
 	
@@ -172,6 +179,8 @@ public:
 	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);
 
 	static bool IsDebugEnabled();
+
+	static void PrintDebugMessage(EMPDebugKey Key, const FString& Message);
 	
 	void SetWantsToSlide(bool bWants);
 
@@ -223,7 +232,13 @@ protected:
 	
 	void OnExitWallRun();
 
+	[[nodiscard]] float GetWallRunTraceLength() const;
+
+	[[nodiscard]] TOptional<FHitResult> TraceWall(const FVector& Start, const FVector& End) const;
+
 	[[nodiscard]] TOptional<FHitResult> TraceCurrentWall() const;
+
+	[[nodiscard]] bool IsTooLowForWallRun() const;
 
 	[[nodiscard]] bool ShouldLeaveWallRun() const;
 
@@ -250,9 +265,9 @@ protected:
 	
 	[[nodiscard]] bool IsWallSurface(const FVector& Normal) const;
 
-	bool FindRunnableWall(FHitResult& OutWallHit) const;
-	
-	bool FindKickableWall(FHitResult& OutKickHit) const;
+	[[nodiscard]] TOptional<FHitResult> FindRunnableWall() const;
+
+	[[nodiscard]] TOptional<FHitResult> FindKickableWall() const;
 
 	void ApplyRopeToVelocity();
 	

@@ -96,16 +96,10 @@ void AMPCharacter::Tick(float DeltaSeconds)
 	}
 
 #if !UE_BUILD_SHIPPING
-	if (UMPCharacterMovementComponent::IsDebugEnabled() && GEngine)
+	if (UMPCharacterMovementComponent::IsDebugEnabled())
 	{
-		constexpr int32 GrappleTargetKey = 7;
-
-		GEngine->AddOnScreenDebugMessage(
-			GrappleTargetKey,
-			0.f,
-			FColor::Cyan,
-			FString::Printf(TEXT("Grapple target: %s"), NewTarget ? *NewTarget->GetName() : TEXT("none"))
-		);
+		UMPCharacterMovementComponent::PrintDebugMessage(EMPDebugKey::GrappleTarget,
+			FString::Printf(TEXT("Grapple target: %s"), NewTarget ? *NewTarget->GetName() : TEXT("none")));
 	}
 #endif
 }
