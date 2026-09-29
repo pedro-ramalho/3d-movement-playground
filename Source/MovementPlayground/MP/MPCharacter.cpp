@@ -47,27 +47,7 @@ void AMPCharacter::BeginPlay()
 		AnimInstance->OnPlayMontageNotifyBegin.AddDynamic(this, &AMPCharacter::OnMontageNotifyBegin);
 	}
 
-	if (SlideMontage)
-	{
-		constexpr float SampleStep = 1.f / 30.f;
-		const float Length = SlideMontage->GetPlayLength();
-
-		for (float Start = 0.f; Start < Length; Start += SampleStep)
-		{
-			const float End = FMath::Min(Start + SampleStep, Length);
-			const float SliceTime = End - Start;
-
-			if (SliceTime < UE_KINDA_SMALL_NUMBER)
-			{
-				break;
-			}
-
-			const FTransform RootMotion = SlideMontage->ExtractRootMotionFromTrackRange(Start, End, FAnimExtractContext());
-			const float SliceSpeed = RootMotion.GetTranslation().Size2D() / SliceTime * SlideMontage->RateScale;
-
-			SlideMontagePeakSpeed = FMath::Max(SlideMontagePeakSpeed, SliceSpeed);
-		}
-	}
+	SlideMontagePeakSpeed = MeasureSlideMontagePeakSpeed();
 }
 
 void AMPCharacter::OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload)
@@ -125,49 +105,100 @@ void AMPCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompone
 void AMPCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode)
 {
 	Super::OnMovementModeChanged(PrevMovementMode, PreviousCustomMode);
-	
-	if (GetMPMovement()->IsSliding())
+
+	const UMPCharacterMovementComponent* Movement = GetMPMovement();
+
+	if (Movement->IsSliding())
 	{
-		const float EntrySpeed = GetVelocity().Size2D();
-		float RootMotionScale = 1.f;
-
-		if (SlideMontagePeakSpeed > UE_KINDA_SMALL_NUMBER)
-		{
-			RootMotionScale = FMath::Clamp(EntrySpeed * SlideSpeedMultiplier / SlideMontagePeakSpeed, SlideRootMotionScaleMin, SlideRootMotionScaleMax);
-		}
-
-		SetAnimRootMotionTranslationScale(RootMotionScale);
-
-		UE_LOG(LogMPMovement, Log, TEXT("Slide entry: %.0f cm/s, root motion scale %.2f"), EntrySpeed, RootMotionScale);
-
-		PlayAnimMontage(SlideMontage);
+		StartSlideMontage();
 	}
-	
-	if (WallKickMontage && (GetMPMovement()->MovementMode == MOVE_Walking || GetMPMovement()->IsWallRunning() || GetMPMovement()->IsGrappling()))
+
+	const bool bWallKickOver = Movement->MovementMode == MOVE_Walking || Movement->IsWallRunning() || Movement->IsGrappling();
+
+	if (WallKickMontage && bWallKickOver)
 	{
 		StopAnimMontage(WallKickMontage);
 	}
-	
-	if (PrevMovementMode == MOVE_Custom && static_cast<EMPCustomMovementMode>(PreviousCustomMode) == EMPCustomMovementMode::Slide)
-	{
-		SetAnimRootMotionTranslationScale(1.f);
 
-		if (GetCharacterMovement()->MovementMode != MOVE_Walking)
+	const bool bWasSliding = PrevMovementMode == MOVE_Custom
+		&& static_cast<EMPCustomMovementMode>(PreviousCustomMode) == EMPCustomMovementMode::Slide;
+
+	if (bWasSliding)
+	{
+		EndSlideMontage();
+	}
+}
+
+float AMPCharacter::MeasureSlideMontagePeakSpeed() const
+{
+	if (!SlideMontage)
+	{
+		return 0.f;
+	}
+
+	constexpr float SampleStep = 1.f / 30.f;
+	const float Length = SlideMontage->GetPlayLength();
+	float PeakSpeed = 0.f;
+
+	for (float Start = 0.f; Start < Length; Start += SampleStep)
+	{
+		const float End = FMath::Min(Start + SampleStep, Length);
+		const float SliceTime = End - Start;
+
+		if (SliceTime < UE_KINDA_SMALL_NUMBER)
 		{
-			if (SlideMontage)
-			{
-				if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
-				{
-					if (FAnimMontageInstance* MontageInstance = AnimInstance->GetActiveInstanceForMontage(SlideMontage))
-					{
-						MontageInstance->PushDisableRootMotion();
-					}
-				}
-				
-				StopAnimMontage(SlideMontage);
-			}
+			break;
+		}
+
+		const FTransform RootMotion = SlideMontage->ExtractRootMotionFromTrackRange(Start, End, FAnimExtractContext());
+		const float SliceSpeed = RootMotion.GetTranslation().Size2D() / SliceTime * SlideMontage->RateScale;
+
+		PeakSpeed = FMath::Max(PeakSpeed, SliceSpeed);
+	}
+
+	return PeakSpeed;
+}
+
+float AMPCharacter::ComputeSlideRootMotionScale(float EntrySpeed) const
+{
+	if (SlideMontagePeakSpeed <= UE_KINDA_SMALL_NUMBER)
+	{
+		return 1.f;
+	}
+
+	return FMath::Clamp(EntrySpeed * SlideSpeedMultiplier / SlideMontagePeakSpeed, SlideRootMotionScaleMin, SlideRootMotionScaleMax);
+}
+
+void AMPCharacter::StartSlideMontage()
+{
+	const float EntrySpeed = GetVelocity().Size2D();
+	const float RootMotionScale = ComputeSlideRootMotionScale(EntrySpeed);
+
+	SetAnimRootMotionTranslationScale(RootMotionScale);
+
+	UE_LOG(LogMPMovement, Log, TEXT("Slide entry: %.0f cm/s, root motion scale %.2f"), EntrySpeed, RootMotionScale);
+
+	PlayAnimMontage(SlideMontage);
+}
+
+void AMPCharacter::EndSlideMontage()
+{
+	SetAnimRootMotionTranslationScale(1.f);
+
+	if (GetMPMovement()->MovementMode == MOVE_Walking || !SlideMontage)
+	{
+		return;
+	}
+
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+	{
+		if (FAnimMontageInstance* MontageInstance = AnimInstance->GetActiveInstanceForMontage(SlideMontage))
+		{
+			MontageInstance->PushDisableRootMotion();
 		}
 	}
+
+	StopAnimMontage(SlideMontage);
 }
 
 void AMPCharacter::Move(const FInputActionValue &Value)

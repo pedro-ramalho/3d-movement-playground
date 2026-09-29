@@ -70,6 +70,15 @@ class MOVEMENTPLAYGROUND_API AMPCharacter : public ACharacter
 
 	void SetupGrappleCable();
 
+	// Slide Animation
+	[[nodiscard]] float MeasureSlideMontagePeakSpeed() const;
+
+	[[nodiscard]] float ComputeSlideRootMotionScale(float EntrySpeed) const;
+
+	void StartSlideMontage();
+
+	void EndSlideMontage();
+
 protected:
 	// Overrides from ACharacter 
 	virtual void BeginPlay() override;
