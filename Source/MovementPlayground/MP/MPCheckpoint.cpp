@@ -1,27 +1,48 @@
 // Fill out your copyright notice in the Description page of Project Settings.
 
-
 #include "MP/MPCheckpoint.h"
 
-// Sets default values
+#include "Components/ArrowComponent.h"
+#include "Components/BoxComponent.h"
+#include "GameFramework/Pawn.h"
+
 AMPCheckpoint::AMPCheckpoint()
 {
- 	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
-	PrimaryActorTick.bCanEverTick = true;
+	PrimaryActorTick.bCanEverTick = false;
 
+	Trigger = CreateDefaultSubobject<UBoxComponent>(TEXT("Trigger"));
+	RootComponent = Trigger;
+
+	Trigger->SetBoxExtent(FVector(50.f, 400.f, 300.f));
+	Trigger->SetCollisionProfileName(TEXT("Trigger"));
+
+	SpawnPoint = CreateDefaultSubobject<UArrowComponent>(TEXT("SpawnPoint"));
+	SpawnPoint->SetupAttachment(Trigger);
+	SpawnPoint->SetRelativeLocation(FVector(-200.f, 0.f, 0.f));
+	SpawnPoint->ArrowSize = 2.f;
 }
 
-// Called when the game starts or when spawned
+FTransform AMPCheckpoint::GetSpawnTransform() const
+{
+	return FTransform(SpawnPoint->GetComponentRotation(), SpawnPoint->GetComponentLocation());
+}
+
 void AMPCheckpoint::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
+	Trigger->OnComponentBeginOverlap.AddDynamic(this, &AMPCheckpoint::OnTriggerBeginOverlap);
 }
 
-// Called every frame
-void AMPCheckpoint::Tick(float DeltaTime)
+void AMPCheckpoint::OnTriggerBeginOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor, UPrimitiveComponent* OtherComp,
+	int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
 {
-	Super::Tick(DeltaTime);
+	const APawn* Pawn = Cast<APawn>(OtherActor);
 
+	if (!Pawn || !Pawn->IsPlayerControlled() || OtherComp != Pawn->GetRootComponent())
+	{
+		return;
+	}
+
+	OnPlayerReached.Broadcast(this);
 }
-
