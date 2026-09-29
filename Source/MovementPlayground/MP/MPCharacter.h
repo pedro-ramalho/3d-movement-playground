@@ -13,7 +13,7 @@ class UCameraComponent;
 class UInputAction;
 class UAnimMontage;
 class UCableComponent;
-class AMPGrapplePoint;
+class UMPGrappleComponent;
 
 struct FInputActionValue;
 
@@ -34,7 +34,10 @@ class MOVEMENTPLAYGROUND_API AMPCharacter : public ACharacter
 	
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCableComponent> GrappleCable;
-	
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMPGrappleComponent> GrappleComponent;
+
 	// Animation Montages
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
 	TObjectPtr<UAnimMontage> SlideMontage;
@@ -55,40 +58,18 @@ class MOVEMENTPLAYGROUND_API AMPCharacter : public ACharacter
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.1"))
 	float SlideRootMotionScaleMax = 2.5f;
 
-	// Grapple-Specific Properties
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm"))
-	float GrappleMaxRange = 2500.f;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "deg"))
-	float GrappleAimAngle = 20.f;
-	
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm"))
-	float GrappleMinHeightAbove = 100.f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "s", ClampMin = "0.0"))
-	float GrappleShotDuration = 0.12f;
-	
 	// Runtime State
 	float SlideMontagePeakSpeed = 0.f;
-	
-	static const FName SlideGetUpNotifyName;
 
-	float GrappleShotStartTime = -1.f;
-	
-	TWeakObjectPtr<AMPGrapplePoint> GrappleTarget;
+	static const FName SlideGetUpNotifyName;
 
 	// Setup Methods
 	void SetupCameraBoom();
-	
-	void SetupFollowCamera();
-	
-	void SetupGrappleCable();
-	
-	// Helper Methods
-	AMPGrapplePoint* FindBestGrapplePoint() const;
 
-	void UpdateGrappleShot();
-	
+	void SetupFollowCamera();
+
+	void SetupGrappleCable();
+
 protected:
 	// Overrides from ACharacter 
 	virtual void BeginPlay() override;
@@ -129,8 +110,6 @@ public:
 	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
 	
 	virtual void OnJumped_Implementation() override;
-	
-	virtual void Tick(float DeltaSeconds) override;
 	// End overrides from ACharacter
 	
 	// Input Handlers

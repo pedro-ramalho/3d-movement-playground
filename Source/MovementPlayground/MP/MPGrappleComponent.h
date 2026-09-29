@@ -3,24 +3,73 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
+#include "Components/ActorComponent.h"
 #include "MPGrappleComponent.generated.h"
 
-UCLASS()
-class MOVEMENTPLAYGROUND_API AMPGrappleComponent : public AActor
+class ACharacter;
+class AMPGrapplePoint;
+class UCableComponent;
+class UCameraComponent;
+class UMPCharacterMovementComponent;
+
+UCLASS(ClassGroup = (MP), meta = (BlueprintSpawnableComponent))
+class MOVEMENTPLAYGROUND_API UMPGrappleComponent : public UActorComponent
 {
 	GENERATED_BODY()
-	
-public:	
-	// Sets default values for this actor's properties
-	AMPGrappleComponent();
+
+public:
+	UMPGrappleComponent();
+
+	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+	void StartGrapple();
+
+	void StopGrapple();
 
 protected:
-	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
 
-public:	
-	// Called every frame
-	virtual void Tick(float DeltaTime) override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+private:
+	UFUNCTION()
+	void OnMovementModeChanged(ACharacter* InCharacter, EMovementMode PrevMovementMode, uint8 PreviousCustomMode);
+
+	AMPGrapplePoint* FindBestGrapplePoint() const;
+
+	void UpdateGrappleTarget();
+
+	void StartGrappleShot();
+
+	void UpdateGrappleShot();
+
+	void HideGrappleCable();
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm"))
+	float GrappleMaxRange = 2500.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "deg"))
+	float GrappleAimAngle = 20.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm"))
+	float GrappleMinHeightAbove = 100.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "s", ClampMin = "0.0"))
+	float GrappleShotDuration = 0.12f;
+
+	UPROPERTY(Transient)
+	TObjectPtr<ACharacter> Character;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMPCharacterMovementComponent> Movement;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCameraComponent> Camera;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UCableComponent> GrappleCable;
+
+	TWeakObjectPtr<AMPGrapplePoint> GrappleTarget;
+
+	float GrappleShotStartTime = -1.f;
 };

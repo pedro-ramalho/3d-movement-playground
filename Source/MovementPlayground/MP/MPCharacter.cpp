@@ -11,13 +11,10 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
 #include "Animation/AnimMontage.h"
-#include "Engine/OverlapResult.h"
-#include "Engine/Engine.h"
-#include "DrawDebugHelpers.h"
 #include "CableComponent.h"
 #include "MP/MPMovementTypes.h"
 #include "MP/MPCharacterMovementComponent.h"
-#include "MP/MPGrapplePoint.h"
+#include "MP/MPGrappleComponent.h"
 
 const FName AMPCharacter::SlideGetUpNotifyName(TEXT("GetUp"));
 
@@ -37,6 +34,8 @@ AMPCharacter::AMPCharacter(const FObjectInitializer& ObjectInitializer) : Super(
 	SetupCameraBoom();
 	SetupFollowCamera();
 	SetupGrappleCable();
+
+	GrappleComponent = CreateDefaultSubobject<UMPGrappleComponent>(TEXT("GrappleComponent"));
 }
 
 void AMPCharacter::BeginPlay()
@@ -69,39 +68,6 @@ void AMPCharacter::BeginPlay()
 			SlideMontagePeakSpeed = FMath::Max(SlideMontagePeakSpeed, SliceSpeed);
 		}
 	}
-}
-
-void AMPCharacter::Tick(float DeltaSeconds)
-{
-	Super::Tick(DeltaSeconds);
-
-	UpdateGrappleShot();
-
-	AMPGrapplePoint* NewTarget = FindBestGrapplePoint();
-	AMPGrapplePoint* OldTarget = GrappleTarget.Get();
-
-	if (NewTarget != OldTarget)
-	{
-		if (OldTarget)
-		{
-			OldTarget->SetHighlighted(false);
-		}
-
-		if (NewTarget)
-		{
-			NewTarget->SetHighlighted(true);
-		}
-
-		GrappleTarget = NewTarget;
-	}
-
-#if !UE_BUILD_SHIPPING
-	if (UMPCharacterMovementComponent::IsDebugEnabled())
-	{
-		UMPCharacterMovementComponent::PrintDebugMessage(EMPDebugKey::GrappleTarget,
-			FString::Printf(TEXT("Grapple target: %s"), NewTarget ? *NewTarget->GetName() : TEXT("none")));
-	}
-#endif
 }
 
 void AMPCharacter::OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload)
@@ -182,27 +148,6 @@ void AMPCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 P
 		StopAnimMontage(WallKickMontage);
 	}
 	
-	if (GrappleCable && GetMPMovement()->IsGrappling())
-	{
-		const AActor* AnchorActor = GetMPMovement()->GetGrappleAnchorActor();
-		USceneComponent* AnchorComponent = AnchorActor ? AnchorActor->GetRootComponent() : nullptr;
-
-		if (AnchorComponent)
-		{
-			GrappleCable->SetAttachEndToComponent(AnchorComponent);
-			GrappleCable->EndLocation = AnchorComponent->GetComponentTransform().InverseTransformPosition(GrappleCable->GetComponentLocation());
-			GrappleCable->SetVisibility(true);
-
-			GrappleShotStartTime = GetWorld()->GetTimeSeconds();
-		}
-	}
-
-	if (GrappleCable && PrevMovementMode == MOVE_Custom && static_cast<EMPCustomMovementMode>(PreviousCustomMode) == EMPCustomMovementMode::Grapple)
-	{
-		GrappleCable->SetVisibility(false);
-		GrappleShotStartTime = -1.f;
-	}
-
 	if (PrevMovementMode == MOVE_Custom && static_cast<EMPCustomMovementMode>(PreviousCustomMode) == EMPCustomMovementMode::Slide)
 	{
 		SetAnimRootMotionTranslationScale(1.f);
@@ -286,13 +231,12 @@ void AMPCharacter::DoSlideEnd()
 
 void AMPCharacter::DoGrappleStart()
 {
-	if (AMPGrapplePoint* Target = GrappleTarget.Get())
-		GetMPMovement()->RequestGrapple(Target->GetAnchorLocation(), Target);
+	GrappleComponent->StartGrapple();
 }
 
 void AMPCharacter::DoGrappleEnd()
 {
-	GetMPMovement()->ReleaseGrapple();
+	GrappleComponent->StopGrapple();
 }
 
 bool AMPCharacter::CanJumpInternal_Implementation() const
@@ -314,32 +258,6 @@ void AMPCharacter::OnJumped_Implementation()
 		PlayAnimMontage(WallKickMontage);
 }
 
-void AMPCharacter::UpdateGrappleShot()
-{
-	if (GrappleShotStartTime < 0.f || !GrappleCable)
-		return;
-
-	const AActor* AnchorActor = GetMPMovement()->GetGrappleAnchorActor();
-	const USceneComponent* AnchorComponent = AnchorActor ? AnchorActor->GetRootComponent() : nullptr;
-
-	const float ShotAlpha = GrappleShotDuration > 0.f
-		? FMath::Clamp((GetWorld()->GetTimeSeconds() - GrappleShotStartTime) / GrappleShotDuration, 0.f, 1.f)
-		: 1.f;
-
-	if (!AnchorComponent || ShotAlpha >= 1.f)
-	{
-		GrappleCable->EndLocation = FVector::ZeroVector;
-		GrappleShotStartTime = -1.f;
-
-		return;
-	}
-
-	const float EasedAlpha = FMath::InterpEaseOut(0.f, 1.f, ShotAlpha, 2.f);
-	const FVector EndWorld = FMath::Lerp(GrappleCable->GetComponentLocation(), AnchorComponent->GetComponentLocation(), EasedAlpha);
-
-	GrappleCable->EndLocation = AnchorComponent->GetComponentTransform().InverseTransformPosition(EndWorld);
-}
-
 void AMPCharacter::SetupGrappleCable()
 {
 	GrappleCable = CreateDefaultSubobject<UCableComponent>(TEXT("GrappleCable"));
@@ -355,96 +273,3 @@ void AMPCharacter::SetupGrappleCable()
 	GrappleCable->SetVisibility(false);
 }
 
-AMPGrapplePoint* AMPCharacter::FindBestGrapplePoint() const
-{
-	TArray<FOverlapResult> Candidates;
-	FCollisionQueryParams Params(SCENE_QUERY_STAT(FindBestGrapplePoint), false, this);
-	
-	GetWorld()->OverlapMultiByChannel(Candidates, GetActorLocation(), FQuat::Identity, ECC_Grapple,
-		FCollisionShape::MakeSphere(GrappleMaxRange), Params);
-	
-	const float MinAimDot = FMath::Cos(FMath::DegreesToRadians(GrappleAimAngle));
-	
-	const FVector CameraLocation = FollowCamera->GetComponentLocation();
-	const FVector CameraForward = FollowCamera->GetForwardVector();
-	
-	const FVector CharacterCenter = GetActorLocation();
-	
-	AMPGrapplePoint* BestPoint = nullptr;
-	float BestDot = -1.f;
-
-	FCollisionQueryParams LineParams(SCENE_QUERY_STAT(GrappleLineOfSight), false, this);
-
-	const bool bDebug = UMPCharacterMovementComponent::IsDebugEnabled();
-	TArray<TPair<FVector, FColor>, TInlineAllocator<16>> DebugLines;
-
-	for (const FOverlapResult& Candidate : Candidates)
-	{
-		AMPGrapplePoint* GrapplePoint = Cast<AMPGrapplePoint>(Candidate.GetActor());
-		if (!GrapplePoint)
-			continue;
-		
-		if (GetMPMovement()->IsGrappling() && GrapplePoint == GetMPMovement()->GetGrappleAnchorActor())
-			continue;
-
-		const FVector AnchorLocation = GrapplePoint->GetAnchorLocation();
-
-		const FVector ToPoint = (AnchorLocation - CameraLocation).GetSafeNormal();
-		const float AimDot = FVector::DotProduct(CameraForward, ToPoint);
-
-		if (AimDot < MinAimDot)
-		{
-			if (bDebug)
-			{
-				DebugLines.Emplace(AnchorLocation, FColor::Silver);
-			}
-
-			continue;
-		}
-
-		const bool bTooLow = AnchorLocation.Z < CharacterCenter.Z + GrappleMinHeightAbove;
-
-		FHitResult BlockingHit;
-		const bool bBlocked = !bTooLow && GetWorld()->LineTraceSingleByChannel(
-			BlockingHit, CharacterCenter, AnchorLocation, ECC_Visibility, LineParams
-		);
-
-		if (bTooLow || bBlocked)
-		{
-			if (bDebug)
-			{
-				DebugLines.Emplace(AnchorLocation, FColor::Red);
-			}
-
-			continue;
-		}
-
-		if (bDebug)
-		{
-			DebugLines.Emplace(AnchorLocation, FColor::Yellow);
-		}
-
-		if (AimDot > BestDot)
-		{
-			BestDot = AimDot;
-			BestPoint = GrapplePoint;
-		}
-	}
-
-#if !UE_BUILD_SHIPPING
-	if (bDebug)
-	{
-		for (const TPair<FVector, FColor>& Line : DebugLines)
-		{
-			DrawDebugLine(GetWorld(), CharacterCenter, Line.Key, Line.Value, false, -1.f, 0, 1.5f);
-		}
-
-		if (BestPoint)
-		{
-			DrawDebugLine(GetWorld(), CharacterCenter, BestPoint->GetAnchorLocation(), FColor::Green, false, -1.f, 0, 2.5f);
-		}
-	}
-#endif
-
-	return BestPoint;
-}
