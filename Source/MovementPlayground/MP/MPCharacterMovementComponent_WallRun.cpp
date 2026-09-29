@@ -251,3 +251,27 @@ float UMPCharacterMovementComponent::GetWallRunSide() const
 	
 	return Product > 0.f ? -1.f : 1.f;
 }
+
+void UMPCharacterMovementComponent::PerformWallJump()
+{
+	const FVector AlongWall(Velocity.X, Velocity.Y, 0.f);
+		
+	Velocity = AlongWall + WallRunNormal * WallJumpOutSpeed + FVector::UpVector * WallJumpUpSpeed;
+	SetMovementMode(MOVE_Falling);
+}
+
+void UMPCharacterMovementComponent::PerformWallKick(const FHitResult& KickHit)
+{
+	const FVector WallNormal = KickHit.ImpactNormal.GetSafeNormal2D();
+	const FVector HVelocity(Velocity.X, Velocity.Y, 0.f);
+	const FVector AlongWall = FVector::VectorPlaneProject(HVelocity, WallNormal);
+		
+	Velocity = AlongWall + WallNormal * WallKickOutSpeed + FVector::UpVector * WallKickUpSpeed;
+
+	const FVector KickDirection = FVector(Velocity.X, Velocity.Y, 0.f).GetSafeNormal();
+	MoveUpdatedComponent(FVector::ZeroVector, KickDirection.ToOrientationQuat(), false);
+
+	LastWall = KickHit.GetComponent();
+	bIsWallKickFlight = true;
+	bLastJumpWasWallKick = true;
+}

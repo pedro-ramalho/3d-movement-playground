@@ -152,6 +152,10 @@ public:
 	
 	virtual bool DoJump(bool bReplayingMoves, float DeltaTime) override;
 	
+	void PerformWallJump();
+	
+	void PerformWallKick(const FHitResult& KickHit);
+	
 	bool IsCustomMovementMode(EMPCustomMovementMode Mode) const;
 	
 	UFUNCTION(BlueprintPure, Category = "MP|Movement")

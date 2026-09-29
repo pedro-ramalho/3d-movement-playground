@@ -186,34 +186,17 @@ bool UMPCharacterMovementComponent::IsCustomMovementMode(EMPCustomMovementMode M
 bool UMPCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime)
 {
 	bLastJumpWasWallKick = false;
-
+	
 	if (IsCustomMovementMode(EMPCustomMovementMode::WallRun) && CharacterOwner && CharacterOwner->CanJump())
 	{
-		const FVector AlongWall(Velocity.X, Velocity.Y, 0.f);
-		
-		Velocity = AlongWall + WallRunNormal * WallJumpOutSpeed + FVector::UpVector * WallJumpUpSpeed;
-		SetMovementMode(MOVE_Falling);
-		
+		PerformWallJump();
 		return true;
 	}
 	
 	FHitResult KickHit;
 	if (FindKickableWall(KickHit))
 	{
-		const FVector WallNormal = KickHit.ImpactNormal.GetSafeNormal2D();
-		const FVector HVelocity(Velocity.X, Velocity.Y, 0.f);
-		const FVector AlongWall = FVector::VectorPlaneProject(HVelocity, WallNormal);
-		
-		Velocity = AlongWall + WallNormal * WallKickOutSpeed + FVector::UpVector * WallKickUpSpeed;
-
-		// Face where the kick sends us: the approach direction mirrored off the wall, like Super Mario 64
-		const FVector KickDirection = FVector(Velocity.X, Velocity.Y, 0.f).GetSafeNormal();
-		MoveUpdatedComponent(FVector::ZeroVector, KickDirection.ToOrientationQuat(), false);
-
-		LastWall = KickHit.GetComponent();
-		bIsWallKickFlight = true;
-		bLastJumpWasWallKick = true;
-
+		PerformWallKick(KickHit);
 		return true;
 	}
 	
