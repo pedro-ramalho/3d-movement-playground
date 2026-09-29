@@ -334,3 +334,20 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 	LogMovementModeTransition(PreviousMovementMode, PreviousCustomMode);
 }
 
+void UMPCharacterMovementComponent::ExitPhysicsTo(const EMovementMode Mode, const float RemainingTime, const int32 Iterations)
+{
+	SetMovementMode(Mode);
+	StartNewPhysics(RemainingTime, Iterations);
+}
+
+void UMPCharacterMovementComponent::MoveAndSlide(const FVector& Delta, float TimeTick)
+{
+	FHitResult Hit;
+	SafeMoveUpdatedComponent(Delta, UpdatedComponent->GetComponentQuat(), true, Hit);
+
+	if (Hit.IsValidBlockingHit())
+	{
+		HandleImpact(Hit, TimeTick, Delta);
+		SlideAlongSurface(Delta, 1.f - Hit.Time, Hit.Normal, Hit, true);
+	}
+}

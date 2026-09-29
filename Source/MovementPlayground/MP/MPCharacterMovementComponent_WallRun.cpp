@@ -53,9 +53,7 @@ void UMPCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iteration
 		
 		if (!GetWorld()->LineTraceSingleByChannel(WallHit, Start, End, ECC_WallRun, CollisionParams))
 		{
-			SetMovementMode(MOVE_Falling);
-			StartNewPhysics(RemainingTime, Iterations);
-			
+			ExitPhysicsTo(MOVE_Falling, RemainingTime, Iterations);
 			return;
 		}
 		
@@ -65,9 +63,7 @@ void UMPCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iteration
 
 		if (bIsTimerExpired || bIsTooSlow || bIsSteeringAway)
 		{
-			SetMovementMode(MOVE_Falling);
-			StartNewPhysics(RemainingTime, Iterations);
-			
+			ExitPhysicsTo(MOVE_Falling, RemainingTime, Iterations);
 			return;
 		}
 		
@@ -85,25 +81,23 @@ void UMPCharacterMovementComponent::PhysWallRun(float deltaTime, int32 Iteration
 		Velocity.Z = NewVelocityZ;
 		
 		const FVector Delta = (Velocity - WallRunNormal * WallRunStickSpeed) * TimeTick;
-		
-		FHitResult MoveHit;
-		SafeMoveUpdatedComponent(Delta, UpdatedComponent->GetComponentQuat(), true, MoveHit);
-		
-		if (MoveHit.IsValidBlockingHit())
-		{
-			SlideAlongSurface(Delta, 1.f - MoveHit.Time, MoveHit.Normal, MoveHit, true);
-		}
+		MoveAndSlide(Delta, TimeTick);
 
 		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
 
 		if (CurrentFloor.IsWalkableFloor() && Velocity.Z <= 0.f)
 		{
-			SetMovementMode(MOVE_Walking);
-			StartNewPhysics(RemainingTime, Iterations);
-
+			ExitPhysicsTo(MOVE_Walking, RemainingTime, Iterations);
 			return;
 		}
 	}
+}
+
+bool UMPCharacterMovementComponent::IsWallSurface(const FVector& Normal) const
+{
+	const float MaxNormalZ = FMath::Sin(FMath::DegreesToRadians(WallRunMaxSurfaceTilt));
+
+	return FMath::Abs(Normal.Z) <= MaxNormalZ;
 }
 
 bool UMPCharacterMovementComponent::FindRunnableWall(FHitResult& OutWallHit) const
@@ -151,10 +145,9 @@ bool UMPCharacterMovementComponent::FindRunnableWall(FHitResult& OutWallHit) con
 
 	if (bRunnable)
 	{
-		const float MaxNormalZ = FMath::Sin(FMath::DegreesToRadians(WallRunMaxSurfaceTilt));
 		const FVector AlongWallVelocity = FVector::VectorPlaneProject(HVelocity, WallHit.ImpactNormal);
 
-		bRunnable = FMath::Abs(WallHit.ImpactNormal.Z) <= MaxNormalZ
+		bRunnable = IsWallSurface(WallHit.ImpactNormal)
 			&& AlongWallVelocity.Size() >= WallRunMinSpeed
 			&& !bFloorHit;
 	}
@@ -211,11 +204,10 @@ bool UMPCharacterMovementComponent::FindKickableWall(FHitResult& OutKickHit) con
 	
 	if (bKickable)
 	{
-		const float MaxNormalZ = FMath::Sin(FMath::DegreesToRadians(WallRunMaxSurfaceTilt));
 		const float FacingDot = FVector::DotProduct(Forward, -KickHit.ImpactNormal.GetSafeNormal2D());
 		const float MinFacingDot = FMath::Cos(FMath::DegreesToRadians(WallKickMaxAngle));
-		
-		bKickable = FMath::Abs(KickHit.ImpactNormal.Z) <= MaxNormalZ
+
+		bKickable = IsWallSurface(KickHit.ImpactNormal)
 			&& FacingDot >= MinFacingDot;
 	}
 	

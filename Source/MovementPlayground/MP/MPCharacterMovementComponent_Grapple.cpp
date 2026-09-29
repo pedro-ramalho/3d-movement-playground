@@ -39,9 +39,7 @@ void UMPCharacterMovementComponent::PhysGrapple(float deltaTime, int32 Iteration
 		
 		if (ShouldReleaseGrapple())
 		{
-			SetMovementMode(MOVE_Falling);
-			StartNewPhysics(RemainingTime, Iterations);
-		
+			ExitPhysicsTo(MOVE_Falling, RemainingTime, Iterations);
 			return;
 		}
 		
@@ -58,15 +56,7 @@ void UMPCharacterMovementComponent::PhysGrapple(float deltaTime, int32 Iteration
 		
 		ApplyRopeToVelocity();
 		
-		const FVector Delta = Velocity * TimeTick;
-		
-		FHitResult Hit;
-		SafeMoveUpdatedComponent(Delta, UpdatedComponent->GetComponentQuat(), true, Hit);
-		if (Hit.IsValidBlockingHit())
-		{
-			HandleImpact(Hit, TimeTick, Delta);
-			SlideAlongSurface(Delta, 1.f - Hit.Time, Hit.Normal, Hit, true);
-		}
+		MoveAndSlide(Velocity * TimeTick, TimeTick);
 		
 		ApplyRopeToPosition();
 		
@@ -77,9 +67,7 @@ void UMPCharacterMovementComponent::PhysGrapple(float deltaTime, int32 Iteration
 
 			if (CurrentFloor.IsWalkableFloor() && CurrentFloor.FloorDist <= MAX_FLOOR_DIST)
 			{
-				SetMovementMode(MOVE_Walking);
-				StartNewPhysics(RemainingTime, Iterations);
-
+				ExitPhysicsTo(MOVE_Walking, RemainingTime, Iterations);
 				return;
 			}
 		}

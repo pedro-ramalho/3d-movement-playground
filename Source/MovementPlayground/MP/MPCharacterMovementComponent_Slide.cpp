@@ -80,12 +80,9 @@ void UMPCharacterMovementComponent::PhysSlide(float deltaTime, int32 Iterations)
 		const float TimeTick = GetSimulationTimeStep(RemainingTime, Iterations);
 		RemainingTime -= TimeTick;
 
-		// The slide lasts exactly as long as the slide montage; its root motion sets Velocity before we get here
 		if (!CharacterOwner || !CharacterOwner->IsPlayingRootMotion())
 		{
-			SetMovementMode(MOVE_Walking);
-			StartNewPhysics(RemainingTime, Iterations);
-
+			ExitPhysicsTo(MOVE_Walking, RemainingTime, Iterations);
 			return;
 		}
 
@@ -113,9 +110,7 @@ void UMPCharacterMovementComponent::PhysSlide(float deltaTime, int32 Iterations)
 		}
 		else
 		{
-			SetMovementMode(MOVE_Falling);
-			StartNewPhysics(RemainingTime, Iterations);
-			
+			ExitPhysicsTo(MOVE_Falling, RemainingTime, Iterations);
 			return;
 		}
 	}

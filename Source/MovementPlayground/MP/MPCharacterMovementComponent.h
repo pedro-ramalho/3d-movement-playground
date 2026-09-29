@@ -201,6 +201,10 @@ public:
 protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
 	
+	void ExitPhysicsTo(const EMovementMode Mode, const float RemainingTime, const int32 Iterations);
+	
+	void MoveAndSlide(const FVector& Delta, float TimeTick);
+	
 	// Slide Mechanic
 	void PhysSlide(float deltaTime, int32 Iterations);
 	
@@ -228,15 +232,16 @@ protected:
 
 	void OnExitGrapple();
 
-	
 	bool ShouldReleaseGrapple() const;
 	
 	virtual void OnMovementModeChanged(EMovementMode PreviousMovementMode, uint8 PreviousCustomMode) override;
 	
+	[[nodiscard]] bool IsWallSurface(const FVector& Normal) const;
+
 	bool FindRunnableWall(FHitResult& OutWallHit) const;
 	
 	bool FindKickableWall(FHitResult& OutKickHit) const;
-	
+
 	void ApplyRopeToVelocity();
 	
 	void ApplyRopeToPosition();
