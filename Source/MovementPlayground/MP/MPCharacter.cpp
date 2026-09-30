@@ -15,6 +15,7 @@
 #include "MP/MPMovementTypes.h"
 #include "MP/MPCharacterMovementComponent.h"
 #include "MP/MPGrappleComponent.h"
+#include "MovementPlaygroundPlayerController.h"
 
 const FName AMPCharacter::SlideGetUpNotifyName(TEXT("GetUp"));
 
@@ -94,6 +95,17 @@ void AMPCharacter::OnJumped_Implementation()
 		PlayAnimMontage(WallKickMontage);
 }
 
+void AMPCharacter::FellOutOfWorld(const UDamageType& DmgType)
+{
+	if (AMovementPlaygroundPlayerController* PlayerController = GetController<AMovementPlaygroundPlayerController>())
+	{
+		PlayerController->RespawnAtCheckpoint();
+		return;
+	}
+
+	Super::FellOutOfWorld(DmgType);
+}
+
 void AMPCharacter::DoMove(float Right, float Forward)
 {
 	if (GetController() != nullptr)
@@ -147,6 +159,28 @@ void AMPCharacter::DoGrappleStart()
 void AMPCharacter::DoGrappleEnd()
 {
 	GrappleComponent->StopGrapple();
+}
+
+void AMPCharacter::Respawn(const FTransform& SpawnTransform)
+{
+	const FRotator SpawnRotation(0.f, SpawnTransform.Rotator().Yaw, 0.f);
+
+	TeleportTo(SpawnTransform.GetLocation(), SpawnRotation);
+
+	StopJumping();
+	GetMPMovement()->ResetMovementState();
+
+	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+	{
+		AnimInstance->StopAllMontages(0.f);
+	}
+
+	SetAnimRootMotionTranslationScale(1.f);
+
+	if (Controller)
+	{
+		Controller->SetControlRotation(SpawnRotation);
+	}
 }
 
 void AMPCharacter::BeginPlay()

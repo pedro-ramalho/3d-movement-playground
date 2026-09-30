@@ -14,6 +14,7 @@ class UInputAction;
 class UAnimMontage;
 class UCableComponent;
 class UMPGrappleComponent;
+class UDamageType;
 
 struct FInputActionValue;
 
@@ -31,6 +32,8 @@ public:
 	virtual void OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 PreviousCustomMode) override;
 
 	virtual void OnJumped_Implementation() override;
+
+	virtual void FellOutOfWorld(const UDamageType& DmgType) override;
 	// End overrides from ACharacter
 
 	// Input Handlers
@@ -57,6 +60,8 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category="Input")
 	virtual void DoGrappleEnd();
+
+	void Respawn(const FTransform& SpawnTransform);
 
 	// Getters
 	FORCEINLINE UMPCharacterMovementComponent* GetMPMovement() const { return MPMovement; }

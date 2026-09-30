@@ -35,6 +35,8 @@ public:
 
 	virtual FVector GetAirControl(float DeltaTime, float TickAirControl, const FVector& FallAcceleration) override;
 
+	void ResetMovementState();
+
 	bool IsCustomMovementMode(EMPCustomMovementMode Mode) const;
 
 	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);

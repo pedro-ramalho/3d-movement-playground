@@ -167,6 +167,29 @@ FVector UMPCharacterMovementComponent::GetAirControl(float DeltaTime, float Tick
 	return Super::GetAirControl(DeltaTime, TickAirControl, FallAcceleration);
 }
 
+void UMPCharacterMovementComponent::ResetMovementState()
+{
+	bWantsToSlide = false;
+	bWantsToGrapple = false;
+	GrappleAnchorActor.Reset();
+
+	SetMovementMode(MOVE_Falling);
+
+	Velocity = FVector::ZeroVector;
+	ClearAccumulatedForces();
+
+	bWantsToCrouch = false;
+	UnCrouch();
+
+	bHasWallCandidate = false;
+	CurrentWall.Reset();
+	LastWall.Reset();
+
+	bHasKickCandidate = false;
+	bLastJumpWasWallKick = false;
+	bIsWallKickFlight = false;
+}
+
 bool UMPCharacterMovementComponent::IsCustomMovementMode(EMPCustomMovementMode Mode) const
 {
 	if (MovementMode != MOVE_Custom)
