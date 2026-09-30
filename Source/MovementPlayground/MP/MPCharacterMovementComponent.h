@@ -144,6 +144,8 @@ protected:
 
 	[[nodiscard]] bool ShouldReleaseGrapple() const;
 
+	void ApplyGrappleReleaseBoost();
+
 	void UpdateGrappleReel(float TimeTick);
 
 	void ApplyGrappleSwingInput(float TimeTick);
@@ -168,6 +170,12 @@ private:
 private:
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Jump", meta = (ForceUnits = "s", ClampMin = "0.0"))
 	float CoyoteTime = 0.12f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Momentum", meta = (ClampMin = "0.0"))
+	float AirOverspeedBraking = 150.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Momentum", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float MaxMomentumSpeed = 1600.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s"))
 	float SlideEnterSpeed = 350.0f;
@@ -195,6 +203,12 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s"))
 	float WallRunMinSpeed = 300.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.0"))
+	float WallRunAcceleration = 300.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float WallRunMaxSpeed = 900.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm"))
 	float WallRunMinHeight = 60.f;
@@ -235,6 +249,9 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s"))
 	float WallJumpUpSpeed = 500.f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float WallJumpForwardBoost = 200.f;
+
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ForceUnits = "cm"))
 	float WallKickTraceDistance = 20.f;
 
@@ -273,6 +290,12 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "s", ClampMin = "0.0"))
 	float GrappleFloorGraceTime = 0.2f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float GrappleReleaseBoost = 250.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float GrappleReleaseMinSpeed = 600.f;
 
 	float CoyoteTimeEnd = -1.f;
 

@@ -153,7 +153,10 @@ void UMPCharacterMovementComponent::UpdateWallRunVelocity(float TimeTick)
 	const FVector AlongWall = FVector::VectorPlaneProject(HVelocity, WallRunNormal).GetSafeNormal();
 	const float NewVelocityZ = Velocity.Z + GetGravityZ() * GetWallRunGravityScale() * TimeTick;
 
-	Velocity = AlongWall * HVelocity.Size();
+	const float Speed = HVelocity.Size();
+	const float NewSpeed = Speed < WallRunMaxSpeed ? FMath::Min(Speed + WallRunAcceleration * TimeTick, WallRunMaxSpeed) : Speed;
+
+	Velocity = AlongWall * NewSpeed;
 	Velocity.Z = NewVelocityZ;
 }
 
@@ -212,8 +215,10 @@ TOptional<FHitResult> UMPCharacterMovementComponent::FindRunnableWall() const
 void UMPCharacterMovementComponent::PerformWallJump()
 {
 	const FVector AlongWall(Velocity.X, Velocity.Y, 0.f);
+	const FVector ForwardBoost = AlongWall.GetSafeNormal() * WallJumpForwardBoost;
 		
-	Velocity = AlongWall + WallRunNormal * WallJumpOutSpeed + FVector::UpVector * WallJumpUpSpeed;
+	Velocity = AlongWall + ForwardBoost + WallRunNormal * WallJumpOutSpeed + FVector::UpVector * WallJumpUpSpeed;
+	Velocity = Velocity.GetClampedToMaxSize2D(MaxMomentumSpeed);
 	SetMovementMode(MOVE_Falling);
 }
 

@@ -160,6 +160,9 @@ float UMPCharacterMovementComponent::GetMaxBrakingDeceleration() const
 	if (bIsWallKickFlight && IsFalling())
 		return 0.f;
 
+	if (IsFalling() && Velocity.Size2D() > MaxWalkSpeed)
+		return AirOverspeedBraking;
+
 	return Super::GetMaxBrakingDeceleration();
 }
 
