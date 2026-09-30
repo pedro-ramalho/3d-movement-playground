@@ -96,6 +96,12 @@ protected:
 
 	void PhysSlide(float deltaTime, int32 Iterations);
 
+	void ApplySlideBoost();
+
+	[[nodiscard]] bool ShouldLeaveSlide() const;
+
+	void UpdateSlideVelocity(float TimeTick);
+
 	void TryEnterWallRun();
 
 	void OnEnterWallRun();
@@ -165,6 +171,27 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s"))
 	float SlideEnterSpeed = 350.0f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float SlideExitSpeed = 250.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float SlideBoost = 300.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "s", ClampMin = "0.0"))
+	float SlideBoostCooldown = 1.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float SlideMaxSpeed = 1500.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.0"))
+	float SlideFriction = 400.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.0"))
+	float SlideGravityScale = 2.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.0"))
+	float SlideSteering = 400.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s"))
 	float WallRunMinSpeed = 300.f;
@@ -250,6 +277,7 @@ private:
 	float CoyoteTimeEnd = -1.f;
 
 	bool bWantsToSlide = false;
+	float SlideBoostReadyTime = 0.f;
 
 	bool bHasWallCandidate = false;
 	FVector WallRunNormal = FVector::ZeroVector;

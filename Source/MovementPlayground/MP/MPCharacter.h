@@ -4,7 +4,6 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
-#include "Animation/AnimNotifies/AnimNotify.h"
 #include "MPCharacter.generated.h"
 
 class UMPCharacterMovementComponent;
@@ -72,8 +71,6 @@ public:
 
 protected:
 	// Overrides from ACharacter
-	virtual void BeginPlay() override;
-
 	virtual bool CanJumpInternal_Implementation() const override;
 	// End overrides from ACharacter
 
@@ -103,9 +100,6 @@ protected:
 	TObjectPtr<UInputAction> MouseLookAction;
 
 private:
-	UFUNCTION()
-	void OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload);
-
 	// Setup Methods
 	void SetupCameraBoom();
 
@@ -113,11 +107,9 @@ private:
 
 	void SetupGrappleCable();
 
-	[[nodiscard]] float MeasureSlideMontagePeakSpeed() const;
-
-	[[nodiscard]] float ComputeSlideRootMotionScale(float EntrySpeed) const;
-
 	void StartSlideMontage();
+
+	void HoldSlidePose();
 
 	void EndSlideMontage();
 
@@ -148,20 +140,12 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Jump", meta = (ForceUnits = "s", ClampMin = "0.0"))
 	float JumpBufferTime = 0.15f;
 
-	// Slide-Specific Properties
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide")
-	float SlideSpeedMultiplier = 1.2f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.1"))
-	float SlideRootMotionScaleMin = 0.5f;
-
-	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.1"))
-	float SlideRootMotionScaleMax = 2.5f;
-
 	// Runtime State
-	float SlideMontagePeakSpeed = 0.f;
-
 	float JumpBufferEnd = -1.f;
 
-	static const FName SlideGetUpNotifyName;
+	FTimerHandle SlidePoseTimer;
+
+	static const FName SlideLoopSectionName;
+
+	static const FName SlideExitSectionName;
 };

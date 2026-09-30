@@ -9,6 +9,7 @@
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/World.h"
+#include "TimerManager.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
 #include "Animation/AnimMontage.h"
@@ -18,7 +19,8 @@
 #include "MP/MPGrappleComponent.h"
 #include "MovementPlaygroundPlayerController.h"
 
-const FName AMPCharacter::SlideGetUpNotifyName(TEXT("GetUp"));
+const FName AMPCharacter::SlideLoopSectionName(TEXT("Loop"));
+const FName AMPCharacter::SlideExitSectionName(TEXT("Exit"));
 
 AMPCharacter::AMPCharacter(const FObjectInitializer& ObjectInitializer) : Super(
 	ObjectInitializer.SetDefaultSubobjectClass<UMPCharacterMovementComponent>(CharacterMovementComponentName))
@@ -185,24 +187,10 @@ void AMPCharacter::Respawn(const FTransform& SpawnTransform)
 		AnimInstance->StopAllMontages(0.f);
 	}
 
-	SetAnimRootMotionTranslationScale(1.f);
-
 	if (Controller)
 	{
 		Controller->SetControlRotation(SpawnRotation);
 	}
-}
-
-void AMPCharacter::BeginPlay()
-{
-	Super::BeginPlay();
-
-	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
-	{
-		AnimInstance->OnPlayMontageNotifyBegin.AddDynamic(this, &AMPCharacter::OnMontageNotifyBegin);
-	}
-
-	SlideMontagePeakSpeed = MeasureSlideMontagePeakSpeed();
 }
 
 bool AMPCharacter::CanJumpInternal_Implementation() const
@@ -231,22 +219,6 @@ void AMPCharacter::Look(const FInputActionValue &Value)
 	FVector2D LookAxisVector = Value.Get<FVector2D>();
 	
 	DoLook(LookAxisVector.X, LookAxisVector.Y);
-}
-
-void AMPCharacter::OnMontageNotifyBegin(FName NotifyName, const FBranchingPointNotifyPayload& BranchingPointPayload)
-{
-	if (NotifyName != SlideGetUpNotifyName || !GetMPMovement()->IsSliding())
-	{
-		return;
-	}
-
-	if (GetMPMovement()->CanStandUp())
-	{
-		return;
-	}
-
-	StopAnimMontage(SlideMontage);
-	GetMPMovement()->SetMovementMode(MOVE_Walking);
 }
 
 void AMPCharacter::SetupCameraBoom()
@@ -279,73 +251,69 @@ void AMPCharacter::SetupGrappleCable()
 	GrappleCable->SetVisibility(false);
 }
 
-float AMPCharacter::MeasureSlideMontagePeakSpeed() const
-{
-	if (!SlideMontage)
-	{
-		return 0.f;
-	}
-
-	constexpr float SampleStep = 1.f / 30.f;
-	const float Length = SlideMontage->GetPlayLength();
-	float PeakSpeed = 0.f;
-
-	for (float Start = 0.f; Start < Length; Start += SampleStep)
-	{
-		const float End = FMath::Min(Start + SampleStep, Length);
-		const float SliceTime = End - Start;
-
-		if (SliceTime < UE_KINDA_SMALL_NUMBER)
-		{
-			break;
-		}
-
-		const FTransform RootMotion = SlideMontage->ExtractRootMotionFromTrackRange(Start, End, FAnimExtractContext());
-		const float SliceSpeed = RootMotion.GetTranslation().Size2D() / SliceTime * SlideMontage->RateScale;
-
-		PeakSpeed = FMath::Max(PeakSpeed, SliceSpeed);
-	}
-
-	return PeakSpeed;
-}
-
-float AMPCharacter::ComputeSlideRootMotionScale(float EntrySpeed) const
-{
-	if (SlideMontagePeakSpeed <= UE_KINDA_SMALL_NUMBER)
-	{
-		return 1.f;
-	}
-
-	return FMath::Clamp(EntrySpeed * SlideSpeedMultiplier / SlideMontagePeakSpeed, SlideRootMotionScaleMin, SlideRootMotionScaleMax);
-}
-
 void AMPCharacter::StartSlideMontage()
 {
-	const float EntrySpeed = GetVelocity().Size2D();
-	const float RootMotionScale = ComputeSlideRootMotionScale(EntrySpeed);
-
-	SetAnimRootMotionTranslationScale(RootMotionScale);
-
-	UE_LOG(LogMPMovement, Log, TEXT("Slide entry: %.0f cm/s, root motion scale %.2f"), EntrySpeed, RootMotionScale);
-
-	PlayAnimMontage(SlideMontage);
-}
-
-void AMPCharacter::EndSlideMontage()
-{
-	SetAnimRootMotionTranslationScale(1.f);
-
-	if (GetMPMovement()->MovementMode == MOVE_Walking || !SlideMontage)
+	if (!SlideMontage)
 	{
 		return;
 	}
 
-	if (UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance())
+	PlayAnimMontage(SlideMontage);
+
+	const int32 LoopIndex = SlideMontage->GetSectionIndex(SlideLoopSectionName);
+
+	if (LoopIndex == INDEX_NONE)
 	{
-		if (FAnimMontageInstance* MontageInstance = AnimInstance->GetActiveInstanceForMontage(SlideMontage))
-		{
-			MontageInstance->PushDisableRootMotion();
-		}
+		return;
+	}
+
+	const float LoopStart = SlideMontage->GetAnimCompositeSection(LoopIndex).GetTime() / FMath::Max(SlideMontage->RateScale, UE_KINDA_SMALL_NUMBER);
+
+	GetWorldTimerManager().SetTimer(SlidePoseTimer, this, &AMPCharacter::HoldSlidePose, FMath::Max(LoopStart, UE_KINDA_SMALL_NUMBER), false);
+}
+
+void AMPCharacter::HoldSlidePose()
+{
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+
+	if (!AnimInstance || !AnimInstance->Montage_IsPlaying(SlideMontage))
+	{
+		return;
+	}
+
+	const FName CurrentSection = AnimInstance->Montage_GetCurrentSection(SlideMontage);
+
+	if (CurrentSection == SlideLoopSectionName)
+	{
+		AnimInstance->Montage_Pause(SlideMontage);
+		return;
+	}
+
+	if (CurrentSection != SlideExitSectionName)
+	{
+		SlidePoseTimer = GetWorldTimerManager().SetTimerForNextTick(this, &AMPCharacter::HoldSlidePose);
+	}
+}
+
+void AMPCharacter::EndSlideMontage()
+{
+	GetWorldTimerManager().ClearTimer(SlidePoseTimer);
+
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+
+	if (!SlideMontage || !AnimInstance || !AnimInstance->Montage_IsActive(SlideMontage))
+	{
+		return;
+	}
+
+	AnimInstance->Montage_Resume(SlideMontage);
+
+	const bool bStandingUp = GetMPMovement()->MovementMode == MOVE_Walking;
+
+	if (bStandingUp && SlideMontage->IsValidSectionName(SlideExitSectionName))
+	{
+		AnimInstance->Montage_JumpToSection(SlideExitSectionName, SlideMontage);
+		return;
 	}
 
 	StopAnimMontage(SlideMontage);
