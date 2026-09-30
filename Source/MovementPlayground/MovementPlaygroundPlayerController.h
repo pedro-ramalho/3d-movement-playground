@@ -9,6 +9,7 @@
 class AMPCourse;
 class UInputAction;
 class UInputMappingContext;
+class UMPHUDWidget;
 class UUserWidget;
 
 /**
@@ -65,4 +66,10 @@ private:
 
 	UPROPERTY(Transient)
 	TObjectPtr<AMPCourse> Course;
+	
+	UPROPERTY(EditAnywhere, Category = "UI")
+	TSubclassOf<UMPHUDWidget> HUDWidgetClass;
+	
+	UPROPERTY(Transient)
+	TObjectPtr<UMPHUDWidget> HUDWidget;
 };

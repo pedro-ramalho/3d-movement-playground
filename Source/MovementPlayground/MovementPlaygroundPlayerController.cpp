@@ -12,6 +12,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "MP/MPCharacter.h"
 #include "MP/MPCourse.h"
+#include "MP/MPHUDWidget.h"
 
 void AMovementPlaygroundPlayerController::RespawnAtCheckpoint()
 {
@@ -38,6 +39,16 @@ void AMovementPlaygroundPlayerController::BeginPlay()
 
 	Course = Cast<AMPCourse>(UGameplayStatics::GetActorOfClass(this, AMPCourse::StaticClass()));
 
+	if (IsLocalPlayerController() && HUDWidgetClass)
+	{
+		HUDWidget = CreateWidget<UMPHUDWidget>(this, HUDWidgetClass);
+		if (HUDWidget)
+		{
+			HUDWidget->SetCourse(Course);
+			HUDWidget->AddToPlayerScreen();
+		}
+	}
+	
 	// only spawn touch controls on local player controllers
 	if (IsLocalPlayerController() && ShouldUseTouchControls())
 	{
