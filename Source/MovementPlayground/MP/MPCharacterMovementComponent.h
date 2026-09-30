@@ -37,6 +37,8 @@ public:
 
 	void ResetMovementState();
 
+	[[nodiscard]] bool IsWithinCoyoteTime() const;
+
 	bool IsCustomMovementMode(EMPCustomMovementMode Mode) const;
 
 	static FString MovementModeToString(EMovementMode Mode, uint8 CustomMode);
@@ -158,6 +160,9 @@ private:
 	void DrawDebugTraceSphere(const FVector& Center, float Radius, const FColor& Color) const;
 
 private:
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Jump", meta = (ForceUnits = "s", ClampMin = "0.0"))
+	float CoyoteTime = 0.12f;
+
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s"))
 	float SlideEnterSpeed = 350.0f;
 
@@ -241,6 +246,8 @@ private:
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "s", ClampMin = "0.0"))
 	float GrappleFloorGraceTime = 0.2f;
+
+	float CoyoteTimeEnd = -1.f;
 
 	bool bWantsToSlide = false;
 

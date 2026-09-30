@@ -8,6 +8,7 @@
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/World.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "InputActionValue.h"
 #include "Animation/AnimMontage.h"
@@ -85,11 +86,19 @@ void AMPCharacter::OnMovementModeChanged(EMovementMode PrevMovementMode, uint8 P
 	{
 		EndSlideMontage();
 	}
+
+	if (Movement->MovementMode == MOVE_Walking && GetWorld()->GetTimeSeconds() <= JumpBufferEnd)
+	{
+		JumpBufferEnd = -1.f;
+		Jump();
+	}
 }
 
 void AMPCharacter::OnJumped_Implementation()
 {
 	Super::OnJumped_Implementation();
+
+	JumpBufferEnd = -1.f;
 	
 	if (GetMPMovement()->LastJumpWasWallKick() && WallKickMontage)
 		PlayAnimMontage(WallKickMontage);
@@ -133,6 +142,7 @@ void AMPCharacter::DoLook(float Yaw, float Pitch)
 
 void AMPCharacter::DoJumpStart()
 {
+	JumpBufferEnd = GetWorld()->GetTimeSeconds() + JumpBufferTime;
 	Jump();
 }
 
@@ -201,6 +211,9 @@ bool AMPCharacter::CanJumpInternal_Implementation() const
 		return JumpIsAllowedInternal();
 	
 	if (GetMPMovement()->CanWallKick())
+		return true;
+
+	if (GetMPMovement()->IsWithinCoyoteTime())
 		return true;
 	
 	return Super::CanJumpInternal_Implementation();

@@ -111,16 +111,25 @@ bool UMPCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime
 	if (IsCustomMovementMode(EMPCustomMovementMode::WallRun) && CharacterOwner && CharacterOwner->CanJump())
 	{
 		PerformWallJump();
+		CoyoteTimeEnd = -1.f;
 		return true;
 	}
 	
 	if (const TOptional<FHitResult> KickHit = FindKickableWall())
 	{
 		PerformWallKick(*KickHit);
+		CoyoteTimeEnd = -1.f;
 		return true;
 	}
 	
-	return Super::DoJump(bReplayingMoves, DeltaTime);
+	const bool bJumped = Super::DoJump(bReplayingMoves, DeltaTime);
+
+	if (bJumped)
+	{
+		CoyoteTimeEnd = -1.f;
+	}
+
+	return bJumped;
 }
 
 FRotator UMPCharacterMovementComponent::ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const
@@ -188,6 +197,12 @@ void UMPCharacterMovementComponent::ResetMovementState()
 	bHasKickCandidate = false;
 	bLastJumpWasWallKick = false;
 	bIsWallKickFlight = false;
+	CoyoteTimeEnd = -1.f;
+}
+
+bool UMPCharacterMovementComponent::IsWithinCoyoteTime() const
+{
+	return IsFalling() && GetWorld()->GetTimeSeconds() <= CoyoteTimeEnd;
 }
 
 bool UMPCharacterMovementComponent::IsCustomMovementMode(EMPCustomMovementMode Mode) const
@@ -274,6 +289,14 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 	if (MovementMode != MOVE_Falling)
 	{
 		bIsWallKickFlight = false;
+	}
+
+	const bool bLeftGround = PreviousMovementMode == MOVE_Walking
+		|| (PreviousMovementMode == MOVE_Custom && static_cast<EMPCustomMovementMode>(PreviousCustomMode) == EMPCustomMovementMode::Slide);
+
+	if (MovementMode == MOVE_Falling && bLeftGround)
+	{
+		CoyoteTimeEnd = GetWorld()->GetTimeSeconds() + CoyoteTime;
 	}
 
 	LogMovementModeTransition(PreviousMovementMode, PreviousCustomMode);

@@ -1,9 +1,9 @@
-// Fill out your copyright notice in the Description page of Project Settings.
-
 #include "MP/MPCourse.h"
 #include "MP/MPCheckpoint.h"
+#include "MP/MPSaveGame.h"
 
 #include "Engine/World.h"
+#include "Kismet/GameplayStatics.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogMPCourse, Log, All);
 
@@ -77,6 +77,8 @@ void AMPCourse::BeginPlay()
 			Checkpoint->OnPlayerReached.AddUObject(this, &AMPCourse::OnCheckpointReached);
 		}
 	}
+	
+	LoadBestRun();
 }
 
 void AMPCourse::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -161,6 +163,7 @@ void AMPCourse::FinishRun()
 	if (bNewBest)
 	{
 		BestSplits = CurrentSplits;
+		SaveBestRun();
 	}
 
 	UE_LOG(LogMPCourse, Log, TEXT("Run finished: %.3f s, medal: %s, new best: %s"),
@@ -209,4 +212,29 @@ TArray<AMPCheckpoint*> AMPCourse::GetAllCheckpoints() const
 	AllCheckpoints.Add(FinishLine);
 
 	return AllCheckpoints;
+}
+
+void AMPCourse::LoadBestRun()
+{
+	if (!UGameplayStatics::DoesSaveGameExist(SaveSlotName, 0))
+	{
+		return;
+	}
+	
+	if (const UMPSaveGame* Save = Cast<UMPSaveGame>(UGameplayStatics::LoadGameFromSlot(SaveSlotName, 0)))
+	{
+		if (Save->BestSplits.Num() == Checkpoints.Num() + 1)
+		{
+			BestSplits = Save->BestSplits;
+		}
+	}
+}
+
+void AMPCourse::SaveBestRun() const
+{
+	if (UMPSaveGame* Save = Cast<UMPSaveGame>(UGameplayStatics::CreateSaveGameObject(UMPSaveGame::StaticClass())))
+	{
+		Save->BestSplits = BestSplits;
+		UGameplayStatics::SaveGameToSlot(Save, SaveSlotName, 0);
+	}
 }

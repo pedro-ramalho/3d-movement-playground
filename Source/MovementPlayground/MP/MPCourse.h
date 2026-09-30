@@ -93,6 +93,10 @@ private:
 	[[nodiscard]] EMPMedal GradeTime(float Time) const;
 
 	[[nodiscard]] TArray<AMPCheckpoint*> GetAllCheckpoints() const;
+	
+	void LoadBestRun();
+	
+	void SaveBestRun() const;
 
 private:
 	UPROPERTY(EditInstanceOnly, Category = "MP|Course")
@@ -115,6 +119,9 @@ private:
 
 	UPROPERTY(EditAnywhere, Category = "MP|Course|Medals", meta = (ForceUnits = "s", ClampMin = "0.0"))
 	float DeveloperTime = 45.f;
+	
+	UPROPERTY(EditAnywhere, Category = "MP|Course")
+	FString SaveSlotName = TEXT("MPCourse");
 
 	EMPRunState RunState = EMPRunState::WaitingToStart;
 

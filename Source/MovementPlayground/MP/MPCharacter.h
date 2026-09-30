@@ -145,6 +145,9 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")
 	TObjectPtr<UAnimMontage> WallKickMontage;
 
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Jump", meta = (ForceUnits = "s", ClampMin = "0.0"))
+	float JumpBufferTime = 0.15f;
+
 	// Slide-Specific Properties
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide")
 	float SlideSpeedMultiplier = 1.2f;
@@ -157,6 +160,8 @@ private:
 
 	// Runtime State
 	float SlideMontagePeakSpeed = 0.f;
+
+	float JumpBufferEnd = -1.f;
 
 	static const FName SlideGetUpNotifyName;
 };
