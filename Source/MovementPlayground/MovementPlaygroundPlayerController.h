@@ -64,6 +64,9 @@ private:
 	UPROPERTY(EditAnywhere, Category = "Input")
 	TObjectPtr<UInputAction> RestartAction;
 
+	UPROPERTY(EditAnywhere, Category = "Input")
+	TObjectPtr<UInputAction> RespawnAction;
+
 	UPROPERTY(Transient)
 	TObjectPtr<AMPCourse> Course;
 	

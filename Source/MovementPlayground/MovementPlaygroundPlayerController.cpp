@@ -101,6 +101,11 @@ void AMovementPlaygroundPlayerController::SetupInputComponent()
 		{
 			EnhancedInputComponent->BindAction(RestartAction, ETriggerEvent::Started, this, &AMovementPlaygroundPlayerController::RestartRun);
 		}
+
+		if (RespawnAction)
+		{
+			EnhancedInputComponent->BindAction(RespawnAction, ETriggerEvent::Started, this, &AMovementPlaygroundPlayerController::RespawnAtCheckpoint);
+		}
 	}
 }
 

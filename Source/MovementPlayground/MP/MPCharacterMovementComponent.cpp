@@ -31,18 +31,20 @@ UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 
 	// Rotation properties
 	bOrientRotationToMovement = true;
-	RotationRate = FRotator(0.0f, 500.0f, 0.0f);
-	
+	RotationRate = FRotator(0.0f, 720.0f, 0.0f);
+
 	// Jump properties
-	JumpZVelocity = 500.0f;
+	GravityScale = 1.5f;
+	JumpZVelocity = 650.0f;
 	AirControl = 0.35f;
 	BrakingDecelerationFalling = 1500.0f;
-	
+
 	// Walking properties
-	MaxWalkSpeed = 500.f;
+	MaxWalkSpeed = 750.f;
 	MaxWalkSpeedCrouched = 100.f;
 	MinAnalogWalkSpeed = 20.f;
-	BrakingDecelerationWalking = 2000.f;
+	MaxAcceleration = 4000.f;
+	BrakingDecelerationWalking = 3000.f;
 }
 
 void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)

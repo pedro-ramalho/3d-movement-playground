@@ -196,7 +196,7 @@ private:
 	float SlideFriction = 400.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.0"))
-	float SlideGravityScale = 2.f;
+	float SlideGravityScale = 1.33f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.0"))
 	float SlideSteering = 400.f;
@@ -208,7 +208,7 @@ private:
 	float WallRunAcceleration = 300.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
-	float WallRunMaxSpeed = 900.f;
+	float WallRunMaxSpeed = 1100.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm"))
 	float WallRunMinHeight = 60.f;
@@ -226,10 +226,10 @@ private:
 	float WallRunMaxEntryUpSpeed = 250.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.0"))
-	float WallRunGravityScaleStart = 0.3f;
+	float WallRunGravityScaleStart = 0.2f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.0"))
-	float WallRunGravityScaleEnd = 1.5f;
+	float WallRunGravityScaleEnd = 1.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.1"))
 	float WallRunGravityCurveExponent = 2.f;
@@ -247,7 +247,7 @@ private:
 	float WallJumpOutSpeed = 500.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s"))
-	float WallJumpUpSpeed = 500.f;
+	float WallJumpUpSpeed = 610.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
 	float WallJumpForwardBoost = 200.f;
@@ -265,7 +265,7 @@ private:
 	float WallKickOutSpeed = 800.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ForceUnits = "cm/s"))
-	float WallKickUpSpeed = 600.f;
+	float WallKickUpSpeed = 730.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float WallKickAirControl = 1.f;
