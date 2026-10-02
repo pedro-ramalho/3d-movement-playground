@@ -31,18 +31,20 @@ UMPCharacterMovementComponent::UMPCharacterMovementComponent()
 
 	// Rotation properties
 	bOrientRotationToMovement = true;
-	RotationRate = FRotator(0.0f, 500.0f, 0.0f);
-	
+	RotationRate = FRotator(0.0f, 720.0f, 0.0f);
+
 	// Jump properties
-	JumpZVelocity = 500.0f;
+	GravityScale = 1.5f;
+	JumpZVelocity = 650.0f;
 	AirControl = 0.35f;
 	BrakingDecelerationFalling = 1500.0f;
-	
+
 	// Walking properties
-	MaxWalkSpeed = 500.f;
+	MaxWalkSpeed = 750.f;
 	MaxWalkSpeedCrouched = 100.f;
 	MinAnalogWalkSpeed = 20.f;
-	BrakingDecelerationWalking = 2000.f;
+	MaxAcceleration = 4000.f;
+	BrakingDecelerationWalking = 3000.f;
 }
 
 void UMPCharacterMovementComponent::UpdateCharacterStateBeforeMovement(float DeltaSeconds)
@@ -111,16 +113,25 @@ bool UMPCharacterMovementComponent::DoJump(bool bReplayingMoves, float DeltaTime
 	if (IsCustomMovementMode(EMPCustomMovementMode::WallRun) && CharacterOwner && CharacterOwner->CanJump())
 	{
 		PerformWallJump();
+		CoyoteTimeEnd = -1.f;
 		return true;
 	}
 	
 	if (const TOptional<FHitResult> KickHit = FindKickableWall())
 	{
 		PerformWallKick(*KickHit);
+		CoyoteTimeEnd = -1.f;
 		return true;
 	}
 	
-	return Super::DoJump(bReplayingMoves, DeltaTime);
+	const bool bJumped = Super::DoJump(bReplayingMoves, DeltaTime);
+
+	if (bJumped)
+	{
+		CoyoteTimeEnd = -1.f;
+	}
+
+	return bJumped;
 }
 
 FRotator UMPCharacterMovementComponent::ComputeOrientToMovementRotation(const FRotator& CurrentRotation, float DeltaTime, FRotator& DeltaRotation) const
@@ -151,6 +162,9 @@ float UMPCharacterMovementComponent::GetMaxBrakingDeceleration() const
 	if (bIsWallKickFlight && IsFalling())
 		return 0.f;
 
+	if (IsFalling() && Velocity.Size2D() > MaxWalkSpeed)
+		return AirOverspeedBraking;
+
 	return Super::GetMaxBrakingDeceleration();
 }
 
@@ -165,6 +179,35 @@ FVector UMPCharacterMovementComponent::GetAirControl(float DeltaTime, float Tick
 	}
 
 	return Super::GetAirControl(DeltaTime, TickAirControl, FallAcceleration);
+}
+
+void UMPCharacterMovementComponent::ResetMovementState()
+{
+	bWantsToSlide = false;
+	bWantsToGrapple = false;
+	GrappleAnchorActor.Reset();
+
+	SetMovementMode(MOVE_Falling);
+
+	Velocity = FVector::ZeroVector;
+	ClearAccumulatedForces();
+
+	bWantsToCrouch = false;
+	UnCrouch();
+
+	bHasWallCandidate = false;
+	CurrentWall.Reset();
+	LastWall.Reset();
+
+	bHasKickCandidate = false;
+	bLastJumpWasWallKick = false;
+	bIsWallKickFlight = false;
+	CoyoteTimeEnd = -1.f;
+}
+
+bool UMPCharacterMovementComponent::IsWithinCoyoteTime() const
+{
+	return IsFalling() && GetWorld()->GetTimeSeconds() <= CoyoteTimeEnd;
 }
 
 bool UMPCharacterMovementComponent::IsCustomMovementMode(EMPCustomMovementMode Mode) const
@@ -251,6 +294,14 @@ void UMPCharacterMovementComponent::OnMovementModeChanged(EMovementMode Previous
 	if (MovementMode != MOVE_Falling)
 	{
 		bIsWallKickFlight = false;
+	}
+
+	const bool bLeftGround = PreviousMovementMode == MOVE_Walking
+		|| (PreviousMovementMode == MOVE_Custom && static_cast<EMPCustomMovementMode>(PreviousCustomMode) == EMPCustomMovementMode::Slide);
+
+	if (MovementMode == MOVE_Falling && bLeftGround)
+	{
+		CoyoteTimeEnd = GetWorld()->GetTimeSeconds() + CoyoteTime;
 	}
 
 	LogMovementModeTransition(PreviousMovementMode, PreviousCustomMode);

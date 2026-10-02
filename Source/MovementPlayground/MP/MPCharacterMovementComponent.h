@@ -11,6 +11,8 @@ enum class EMPDebugKey : int32;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogMPMovement, Log, All);
 
+DECLARE_MULTICAST_DELEGATE(FMPOnMomentumBoost);
+
 UCLASS()
 class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMovementComponent
 {
@@ -34,6 +36,12 @@ public:
 	virtual float GetMaxBrakingDeceleration() const override;
 
 	virtual FVector GetAirControl(float DeltaTime, float TickAirControl, const FVector& FallAcceleration) override;
+
+	void ResetMovementState();
+
+	[[nodiscard]] bool IsWithinCoyoteTime() const;
+
+	[[nodiscard]] float GetMaxMomentumSpeed() const { return MaxMomentumSpeed; }
 
 	bool IsCustomMovementMode(EMPCustomMovementMode Mode) const;
 
@@ -75,6 +83,9 @@ public:
 
 	const AActor* GetGrappleAnchorActor() const { return GrappleAnchorActor.Get(); }
 
+public:
+	FMPOnMomentumBoost OnMomentumBoost;
+
 protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;
 
@@ -91,6 +102,12 @@ protected:
 	void OnExitSlide();
 
 	void PhysSlide(float deltaTime, int32 Iterations);
+
+	void ApplySlideBoost();
+
+	[[nodiscard]] bool ShouldLeaveSlide() const;
+
+	void UpdateSlideVelocity(float TimeTick);
 
 	void TryEnterWallRun();
 
@@ -134,6 +151,8 @@ protected:
 
 	[[nodiscard]] bool ShouldReleaseGrapple() const;
 
+	void ApplyGrappleReleaseBoost();
+
 	void UpdateGrappleReel(float TimeTick);
 
 	void ApplyGrappleSwingInput(float TimeTick);
@@ -156,11 +175,47 @@ private:
 	void DrawDebugTraceSphere(const FVector& Center, float Radius, const FColor& Color) const;
 
 private:
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Jump", meta = (ForceUnits = "s", ClampMin = "0.0"))
+	float CoyoteTime = 0.12f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Momentum", meta = (ClampMin = "0.0"))
+	float AirOverspeedBraking = 150.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Momentum", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float MaxMomentumSpeed = 1600.f;
+
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s"))
 	float SlideEnterSpeed = 350.0f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float SlideExitSpeed = 250.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float SlideBoost = 300.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "s", ClampMin = "0.0"))
+	float SlideBoostCooldown = 1.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float SlideMaxSpeed = 1500.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.0"))
+	float SlideFriction = 400.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.0"))
+	float SlideGravityScale = 1.33f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Slide", meta = (ClampMin = "0.0"))
+	float SlideSteering = 400.f;
+
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s"))
 	float WallRunMinSpeed = 300.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.0"))
+	float WallRunAcceleration = 300.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float WallRunMaxSpeed = 1100.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm"))
 	float WallRunMinHeight = 60.f;
@@ -178,10 +233,10 @@ private:
 	float WallRunMaxEntryUpSpeed = 250.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.0"))
-	float WallRunGravityScaleStart = 0.3f;
+	float WallRunGravityScaleStart = 0.2f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.0"))
-	float WallRunGravityScaleEnd = 1.5f;
+	float WallRunGravityScaleEnd = 1.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ClampMin = "0.1"))
 	float WallRunGravityCurveExponent = 2.f;
@@ -199,7 +254,10 @@ private:
 	float WallJumpOutSpeed = 500.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s"))
-	float WallJumpUpSpeed = 500.f;
+	float WallJumpUpSpeed = 610.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Run", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float WallJumpForwardBoost = 200.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ForceUnits = "cm"))
 	float WallKickTraceDistance = 20.f;
@@ -214,7 +272,7 @@ private:
 	float WallKickOutSpeed = 800.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ForceUnits = "cm/s"))
-	float WallKickUpSpeed = 600.f;
+	float WallKickUpSpeed = 730.f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Wall Kick", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float WallKickAirControl = 1.f;
@@ -240,7 +298,16 @@ private:
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "s", ClampMin = "0.0"))
 	float GrappleFloorGraceTime = 0.2f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float GrappleReleaseBoost = 250.f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MP|Grapple", meta = (ForceUnits = "cm/s", ClampMin = "0.0"))
+	float GrappleReleaseMinSpeed = 600.f;
+
+	float CoyoteTimeEnd = -1.f;
+
 	bool bWantsToSlide = false;
+	float SlideBoostReadyTime = 0.f;
 
 	bool bHasWallCandidate = false;
 	FVector WallRunNormal = FVector::ZeroVector;

@@ -6,7 +6,10 @@
 #include "GameFramework/PlayerController.h"
 #include "MovementPlaygroundPlayerController.generated.h"
 
+class AMPCourse;
+class UInputAction;
 class UInputMappingContext;
+class UMPHUDWidget;
 class UUserWidget;
 
 /**
@@ -17,6 +20,11 @@ UCLASS(abstract)
 class AMovementPlaygroundPlayerController : public APlayerController
 {
 	GENERATED_BODY()
+
+public:
+	void RespawnAtCheckpoint();
+
+	void RestartRun();
 	
 protected:
 
@@ -49,4 +57,22 @@ protected:
 	/** Returns true if the player should use UMG touch controls */
 	bool ShouldUseTouchControls() const;
 
+private:
+	void RespawnAt(const FTransform& SpawnTransform);
+
+private:
+	UPROPERTY(EditAnywhere, Category = "Input")
+	TObjectPtr<UInputAction> RestartAction;
+
+	UPROPERTY(EditAnywhere, Category = "Input")
+	TObjectPtr<UInputAction> RespawnAction;
+
+	UPROPERTY(Transient)
+	TObjectPtr<AMPCourse> Course;
+	
+	UPROPERTY(EditAnywhere, Category = "UI")
+	TSubclassOf<UMPHUDWidget> HUDWidgetClass;
+	
+	UPROPERTY(Transient)
+	TObjectPtr<UMPHUDWidget> HUDWidget;
 };

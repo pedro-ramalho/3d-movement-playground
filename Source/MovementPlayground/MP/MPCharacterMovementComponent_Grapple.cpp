@@ -69,6 +69,7 @@ void UMPCharacterMovementComponent::PhysGrapple(float deltaTime, int32 Iteration
 		
 		if (ShouldReleaseGrapple())
 		{
+			ApplyGrappleReleaseBoost();
 			ExitPhysicsTo(MOVE_Falling, RemainingTime, Iterations);
 			return;
 		}
@@ -104,6 +105,19 @@ bool UMPCharacterMovementComponent::ShouldReleaseGrapple() const
 	const bool bAnchorGone = !GrappleAnchorActor.IsValid();
 
 	return bReleased || bAnchorGone;
+}
+
+void UMPCharacterMovementComponent::ApplyGrappleReleaseBoost()
+{
+	if (bWantsToGrapple || Velocity.Z < 0.f || Velocity.Size() < GrappleReleaseMinSpeed)
+	{
+		return;
+	}
+
+	Velocity += Velocity.GetSafeNormal() * GrappleReleaseBoost;
+	Velocity = Velocity.GetClampedToMaxSize2D(MaxMomentumSpeed);
+
+	OnMomentumBoost.Broadcast();
 }
 
 void UMPCharacterMovementComponent::UpdateGrappleReel(float TimeTick)

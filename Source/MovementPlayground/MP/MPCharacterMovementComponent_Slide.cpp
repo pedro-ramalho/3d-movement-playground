@@ -64,6 +64,8 @@ void UMPCharacterMovementComponent::OnEnterSlide()
 
 	FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
 	AdjustFloorHeight();
+
+	ApplySlideBoost();
 }
 
 void UMPCharacterMovementComponent::OnExitSlide()
@@ -80,40 +82,72 @@ void UMPCharacterMovementComponent::PhysSlide(float deltaTime, int32 Iterations)
 	{
 		Iterations++;
 		const float TimeTick = GetSimulationTimeStep(RemainingTime, Iterations);
-		RemainingTime -= TimeTick;
 
-		if (!CharacterOwner || !CharacterOwner->IsPlayingRootMotion())
+		if (ShouldLeaveSlide())
 		{
 			ExitPhysicsTo(MOVE_Walking, RemainingTime, Iterations);
 			return;
 		}
 
-		// Keep the animation's speed, but make it follow the floor so slides go up and down ramps
-		FVector Direction = Velocity.GetSafeNormal();
+		RemainingTime -= TimeTick;
 
-		if (CurrentFloor.IsWalkableFloor())
-		{
-			Direction = FVector::VectorPlaneProject(Direction, CurrentFloor.HitResult.ImpactNormal).GetSafeNormal();
-		}
+		UpdateSlideVelocity(TimeTick);
+		MoveAndSlide(Velocity * TimeTick, TimeTick);
 
-		Velocity = Direction * Velocity.Size();
-	
-		const FVector Delta = Velocity * TimeTick;
-		const FQuat Rotation = UpdatedComponent->GetComponentQuat();
-		FHitResult Hit;
-	
-		SafeMoveUpdatedComponent(Delta, Rotation, true, Hit);
-	
 		FindFloor(UpdatedComponent->GetComponentLocation(), CurrentFloor, false);
-	
-		if (CurrentFloor.IsWalkableFloor())
-		{
-			AdjustFloorHeight();
-		}
-		else
+
+		if (!CurrentFloor.IsWalkableFloor())
 		{
 			ExitPhysicsTo(MOVE_Falling, RemainingTime, Iterations);
 			return;
 		}
+
+		AdjustFloorHeight();
 	}
+}
+
+void UMPCharacterMovementComponent::ApplySlideBoost()
+{
+	const float Now = GetWorld()->GetTimeSeconds();
+
+	if (Now < SlideBoostReadyTime)
+	{
+		return;
+	}
+
+	const float Speed = Velocity.Size2D();
+	const float BoostedSpeed = FMath::Max(Speed, FMath::Min(Speed + SlideBoost, SlideMaxSpeed));
+
+	Velocity = Velocity.GetSafeNormal2D() * BoostedSpeed + FVector(0.f, 0.f, Velocity.Z);
+	SlideBoostReadyTime = Now + SlideBoostCooldown;
+
+	if (BoostedSpeed > Speed)
+	{
+		OnMomentumBoost.Broadcast();
+	}
+}
+
+bool UMPCharacterMovementComponent::ShouldLeaveSlide() const
+{
+	const bool bTooSlow = Velocity.Size() < SlideExitSpeed;
+	const bool bReleased = !bWantsToSlide && CanStandUp();
+
+	return bTooSlow || bReleased;
+}
+
+void UMPCharacterMovementComponent::UpdateSlideVelocity(float TimeTick)
+{
+	const FVector FloorNormal = CurrentFloor.IsWalkableFloor() ? CurrentFloor.HitResult.ImpactNormal : FVector::UpVector;
+
+	float Speed = Velocity.Size();
+
+	const FVector InputDirection = FVector::VectorPlaneProject(Acceleration.GetSafeNormal(), FloorNormal);
+	const FVector SteerInput = FVector::VectorPlaneProject(InputDirection, Velocity.GetSafeNormal());
+	Velocity += SteerInput * SlideSteering * TimeTick;
+	Velocity = Velocity.GetSafeNormal() * Speed;
+
+	Velocity += FVector::VectorPlaneProject(FVector(0.f, 0.f, GetGravityZ()), FloorNormal) * SlideGravityScale * TimeTick;
+
+	Speed = FMath::Clamp(Velocity.Size() - SlideFriction * TimeTick, 0.f, SlideMaxSpeed);
+	Velocity = FVector::VectorPlaneProject(Velocity, FloorNormal).GetSafeNormal() * Speed;
 }

@@ -8,11 +8,47 @@
 #include "Blueprint/UserWidget.h"
 #include "MovementPlayground.h"
 #include "Widgets/Input/SVirtualJoystick.h"
+#include "EnhancedInputComponent.h"
+#include "Kismet/GameplayStatics.h"
+#include "MP/MPCharacter.h"
+#include "MP/MPCourse.h"
+#include "MP/MPHUDWidget.h"
+
+void AMovementPlaygroundPlayerController::RespawnAtCheckpoint()
+{
+	if (Course)
+	{
+		RespawnAt(Course->GetRespawnTransform());
+	}
+}
+
+void AMovementPlaygroundPlayerController::RestartRun()
+{
+	if (!Course)
+	{
+		return;
+	}
+
+	Course->ResetRun();
+	RespawnAt(Course->GetRespawnTransform());
+}
 
 void AMovementPlaygroundPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
+	Course = Cast<AMPCourse>(UGameplayStatics::GetActorOfClass(this, AMPCourse::StaticClass()));
+
+	if (IsLocalPlayerController() && HUDWidgetClass)
+	{
+		HUDWidget = CreateWidget<UMPHUDWidget>(this, HUDWidgetClass);
+		if (HUDWidget)
+		{
+			HUDWidget->SetCourse(Course);
+			HUDWidget->AddToPlayerScreen();
+		}
+	}
+	
 	// only spawn touch controls on local player controllers
 	if (IsLocalPlayerController() && ShouldUseTouchControls())
 	{
@@ -58,10 +94,31 @@ void AMovementPlaygroundPlayerController::SetupInputComponent()
 			}
 		}
 	}
+
+	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(InputComponent))
+	{
+		if (RestartAction)
+		{
+			EnhancedInputComponent->BindAction(RestartAction, ETriggerEvent::Started, this, &AMovementPlaygroundPlayerController::RestartRun);
+		}
+
+		if (RespawnAction)
+		{
+			EnhancedInputComponent->BindAction(RespawnAction, ETriggerEvent::Started, this, &AMovementPlaygroundPlayerController::RespawnAtCheckpoint);
+		}
+	}
 }
 
 bool AMovementPlaygroundPlayerController::ShouldUseTouchControls() const
 {
 	// are we on a mobile platform? Should we force touch?
 	return SVirtualJoystick::ShouldDisplayTouchInterface() || bForceTouchControls;
+}
+
+void AMovementPlaygroundPlayerController::RespawnAt(const FTransform& SpawnTransform)
+{
+	if (AMPCharacter* MPCharacter = GetPawn<AMPCharacter>())
+	{
+		MPCharacter->Respawn(SpawnTransform);
+	}
 }
