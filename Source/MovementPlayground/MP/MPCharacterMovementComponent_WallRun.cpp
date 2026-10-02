@@ -220,8 +220,6 @@ void UMPCharacterMovementComponent::PerformWallJump()
 	Velocity = AlongWall + ForwardBoost + WallRunNormal * WallJumpOutSpeed + FVector::UpVector * WallJumpUpSpeed;
 	Velocity = Velocity.GetClampedToMaxSize2D(MaxMomentumSpeed);
 	SetMovementMode(MOVE_Falling);
-
-	OnMomentumBoost.Broadcast();
 }
 
 TOptional<FHitResult> UMPCharacterMovementComponent::FindKickableWall() const
