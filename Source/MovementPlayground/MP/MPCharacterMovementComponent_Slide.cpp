@@ -120,11 +120,6 @@ void UMPCharacterMovementComponent::ApplySlideBoost()
 
 	Velocity = Velocity.GetSafeNormal2D() * BoostedSpeed + FVector(0.f, 0.f, Velocity.Z);
 	SlideBoostReadyTime = Now + SlideBoostCooldown;
-
-	if (BoostedSpeed > Speed)
-	{
-		OnMomentumBoost.Broadcast();
-	}
 }
 
 bool UMPCharacterMovementComponent::ShouldLeaveSlide() const

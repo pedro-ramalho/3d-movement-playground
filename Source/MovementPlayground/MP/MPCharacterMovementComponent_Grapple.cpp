@@ -116,8 +116,6 @@ void UMPCharacterMovementComponent::ApplyGrappleReleaseBoost()
 
 	Velocity += Velocity.GetSafeNormal() * GrappleReleaseBoost;
 	Velocity = Velocity.GetClampedToMaxSize2D(MaxMomentumSpeed);
-
-	OnMomentumBoost.Broadcast();
 }
 
 void UMPCharacterMovementComponent::UpdateGrappleReel(float TimeTick)
