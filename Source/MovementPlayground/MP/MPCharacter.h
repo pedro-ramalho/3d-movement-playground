@@ -13,6 +13,7 @@ class UInputAction;
 class UAnimMontage;
 class UCableComponent;
 class UMPGrappleComponent;
+class UMPCameraEffectsComponent;
 class UDamageType;
 
 struct FInputActionValue;
@@ -129,6 +130,9 @@ private:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UMPGrappleComponent> GrappleComponent;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Components", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMPCameraEffectsComponent> CameraEffectsComponent;
 
 	// Animation Montages
 	UPROPERTY(EditDefaultsOnly, Category = "MP|Animation")

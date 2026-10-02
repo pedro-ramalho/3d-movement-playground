@@ -11,6 +11,8 @@ enum class EMPDebugKey : int32;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogMPMovement, Log, All);
 
+DECLARE_MULTICAST_DELEGATE(FMPOnMomentumBoost);
+
 UCLASS()
 class MOVEMENTPLAYGROUND_API UMPCharacterMovementComponent : public UCharacterMovementComponent
 {
@@ -38,6 +40,8 @@ public:
 	void ResetMovementState();
 
 	[[nodiscard]] bool IsWithinCoyoteTime() const;
+
+	[[nodiscard]] float GetMaxMomentumSpeed() const { return MaxMomentumSpeed; }
 
 	bool IsCustomMovementMode(EMPCustomMovementMode Mode) const;
 
@@ -78,6 +82,9 @@ public:
 	FVector GetGrappleAnchor() const { return GrappleAnchor; }
 
 	const AActor* GetGrappleAnchorActor() const { return GrappleAnchorActor.Get(); }
+
+public:
+	FMPOnMomentumBoost OnMomentumBoost;
 
 protected:
 	virtual void PhysCustom(float deltaTime, int32 Iterations) override;

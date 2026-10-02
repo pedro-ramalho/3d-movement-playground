@@ -17,6 +17,7 @@
 #include "MP/MPMovementTypes.h"
 #include "MP/MPCharacterMovementComponent.h"
 #include "MP/MPGrappleComponent.h"
+#include "MP/MPCameraEffectsComponent.h"
 #include "MovementPlaygroundPlayerController.h"
 
 const FName AMPCharacter::SlideLoopSectionName(TEXT("Loop"));
@@ -40,6 +41,7 @@ AMPCharacter::AMPCharacter(const FObjectInitializer& ObjectInitializer) : Super(
 	SetupGrappleCable();
 
 	GrappleComponent = CreateDefaultSubobject<UMPGrappleComponent>(TEXT("GrappleComponent"));
+	CameraEffectsComponent = CreateDefaultSubobject<UMPCameraEffectsComponent>(TEXT("CameraEffectsComponent"));
 }
 
 // Called to bind functionality to input
@@ -227,6 +229,9 @@ void AMPCharacter::SetupCameraBoom()
     CameraBoom->SetupAttachment(RootComponent);
     CameraBoom->TargetArmLength = 400.0f;
     CameraBoom->bUsePawnControlRotation = true;
+	CameraBoom->bEnableCameraLag = true;
+	CameraBoom->CameraLagSpeed = 10.f;
+	CameraBoom->CameraLagMaxDistance = 100.f;
 }
 
 void AMPCharacter::SetupFollowCamera()
