@@ -10,6 +10,7 @@ class AMPCourse;
 class UInputAction;
 class UInputMappingContext;
 class UMPHUDWidget;
+class UMPPauseMenuWidget;
 class UUserWidget;
 
 /**
@@ -25,7 +26,9 @@ public:
 	void RespawnAtCheckpoint();
 
 	void RestartRun();
-	
+
+	void ResumeGame();
+
 protected:
 
 	/** Input Mapping Contexts */
@@ -60,12 +63,19 @@ protected:
 private:
 	void RespawnAt(const FTransform& SpawnTransform);
 
+	void TogglePause();
+
+	void PauseGame();
+
 private:
 	UPROPERTY(EditAnywhere, Category = "Input")
 	TObjectPtr<UInputAction> RestartAction;
 
 	UPROPERTY(EditAnywhere, Category = "Input")
 	TObjectPtr<UInputAction> RespawnAction;
+
+	UPROPERTY(EditAnywhere, Category = "Input")
+	TObjectPtr<UInputAction> PauseAction;
 
 	UPROPERTY(Transient)
 	TObjectPtr<AMPCourse> Course;
@@ -75,4 +85,10 @@ private:
 	
 	UPROPERTY(Transient)
 	TObjectPtr<UMPHUDWidget> HUDWidget;
+
+	UPROPERTY(EditAnywhere, Category = "UI")
+	TSubclassOf<UMPPauseMenuWidget> PauseMenuWidgetClass;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMPPauseMenuWidget> PauseMenuWidget;
 };

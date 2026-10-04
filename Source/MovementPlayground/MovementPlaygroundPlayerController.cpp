@@ -13,6 +13,7 @@
 #include "MP/MPCharacter.h"
 #include "MP/MPCourse.h"
 #include "MP/MPHUDWidget.h"
+#include "MP/MPPauseMenuWidget.h"
 
 void AMovementPlaygroundPlayerController::RespawnAtCheckpoint()
 {
@@ -33,11 +34,29 @@ void AMovementPlaygroundPlayerController::RestartRun()
 	RespawnAt(Course->GetRespawnTransform());
 }
 
+void AMovementPlaygroundPlayerController::ResumeGame()
+{
+	if (PauseMenuWidget)
+	{
+		PauseMenuWidget->RemoveFromParent();
+	}
+
+	SetPause(false);
+	SetInputMode(FInputModeGameOnly());
+	SetShowMouseCursor(false);
+}
+
 void AMovementPlaygroundPlayerController::BeginPlay()
 {
 	Super::BeginPlay();
 
 	Course = Cast<AMPCourse>(UGameplayStatics::GetActorOfClass(this, AMPCourse::StaticClass()));
+
+	if (IsLocalPlayerController())
+	{
+		SetInputMode(FInputModeGameOnly());
+		SetShowMouseCursor(false);
+	}
 
 	if (IsLocalPlayerController() && HUDWidgetClass)
 	{
@@ -106,6 +125,11 @@ void AMovementPlaygroundPlayerController::SetupInputComponent()
 		{
 			EnhancedInputComponent->BindAction(RespawnAction, ETriggerEvent::Started, this, &AMovementPlaygroundPlayerController::RespawnAtCheckpoint);
 		}
+
+		if (PauseAction)
+		{
+			EnhancedInputComponent->BindAction(PauseAction, ETriggerEvent::Started, this, &AMovementPlaygroundPlayerController::TogglePause);
+		}
 	}
 }
 
@@ -121,4 +145,38 @@ void AMovementPlaygroundPlayerController::RespawnAt(const FTransform& SpawnTrans
 	{
 		MPCharacter->Respawn(SpawnTransform);
 	}
+}
+
+void AMovementPlaygroundPlayerController::TogglePause()
+{
+	if (IsPaused())
+	{
+		ResumeGame();
+		return;
+	}
+
+	PauseGame();
+}
+
+void AMovementPlaygroundPlayerController::PauseGame()
+{
+	if (!PauseMenuWidget && PauseMenuWidgetClass)
+	{
+		PauseMenuWidget = CreateWidget<UMPPauseMenuWidget>(this, PauseMenuWidgetClass);
+	}
+
+	if (!PauseMenuWidget || !SetPause(true))
+	{
+		return;
+	}
+
+	PauseMenuWidget->AddToPlayerScreen(1);
+
+	FInputModeGameAndUI InputMode;
+	InputMode.SetWidgetToFocus(PauseMenuWidget->TakeWidget());
+	InputMode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+	InputMode.SetHideCursorDuringCapture(false);
+
+	SetInputMode(InputMode);
+	SetShowMouseCursor(true);
 }
